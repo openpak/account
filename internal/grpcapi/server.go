@@ -24,6 +24,7 @@ type Server struct {
 	accountv1.UnimplementedIdentityServer
 	accountv1.UnimplementedLinksServer
 	accountv1.UnimplementedEventsServer
+	accountv1.UnimplementedRegistrationServer
 	identity *identity.Service
 	links    *links.Service
 	events   *events.Service

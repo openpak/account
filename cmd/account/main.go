@@ -83,6 +83,7 @@ func run() error {
 	accountv1.RegisterIdentityServer(grpcSrv, apiSrv)
 	accountv1.RegisterLinksServer(grpcSrv, apiSrv)
 	accountv1.RegisterEventsServer(grpcSrv, apiSrv)
+	accountv1.RegisterRegistrationServer(grpcSrv, apiSrv)
 	healthSrv := health.NewServer()
 	healthSrv.SetServingStatus("account", healthv1.HealthCheckResponse_SERVING)
 	healthv1.RegisterHealthServer(grpcSrv, healthSrv)
