@@ -117,7 +117,7 @@ func run() error {
 	go func() { errCh <- grpcSrv.Serve(grpcListener) }()
 	httpSrv := &http.Server{
 		Addr:              cfg.HTTPListenAddr,
-		Handler:           web.New(ident),
+		Handler:           web.New(ident, m, os.Getenv("ACCOUNT_PUBLIC_BASE_URL")),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

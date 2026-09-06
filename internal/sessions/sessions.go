@@ -75,6 +75,9 @@ func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, e
 }
 
 // Heartbeat renews the lease. Expired or unknown sessions are not revived.
+// Sessions of inactive (banned/deleted/pending) accounts are rejected and
+// invalidated on touch (review P1 #5): a ban must not leave a renewable
+// lease behind.
 func (s *Service) Heartbeat(ctx context.Context, sessionID string, lease time.Duration) (time.Duration, error) {
 	if sessionID == "" {
 		return 0, ErrInvalid
@@ -85,14 +88,26 @@ func (s *Service) Heartbeat(ctx context.Context, sessionID string, lease time.Du
 	if lease > MaxLease {
 		lease = MaxLease
 	}
-	tag, err := s.pool.Exec(ctx, `UPDATE adapter_sessions
+	tag, err := s.pool.Exec(ctx, `UPDATE adapter_sessions s
 		SET expires_at = now() + make_interval(secs => $2), updated_at = now()
-		WHERE session_id=$1 AND expires_at > now()`, sessionID, int(lease.Seconds()))
+		FROM accounts a
+		WHERE s.session_id=$1 AND s.expires_at > now()
+		  AND a.id = s.account_id AND a.status = 'active'`, sessionID, int(lease.Seconds()))
 	if err != nil {
 		return 0, err
 	}
 	if tag.RowsAffected() == 1 {
 		return lease, nil
+	}
+	// Distinguish: unknown/expired vs. inactive owner (invalidate on touch).
+	tag, err = s.pool.Exec(ctx, `DELETE FROM adapter_sessions s
+		USING accounts a
+		WHERE s.session_id=$1 AND a.id = s.account_id AND a.status <> 'active'`, sessionID)
+	if err != nil {
+		return 0, err
+	}
+	if tag.RowsAffected() == 1 {
+		return 0, ErrAccountUnknown
 	}
 	return 0, ErrNotFound
 }
@@ -107,18 +122,23 @@ func (s *Service) Expire(ctx context.Context, sessionID string) error {
 }
 
 // Resolve returns the live session for (account, title), if any. Expired
-// rows for the pair are reaped on read.
+// rows for the pair are reaped on read. Sessions of inactive accounts are
+// invalidated and never resolved (review P1 #5).
 func (s *Service) Resolve(ctx context.Context, accountID, titleID string) (*Session, error) {
 	if accountID == "" || titleID == "" {
 		return nil, ErrInvalid
 	}
 	sess := &Session{}
-	err := s.pool.QueryRow(ctx, `SELECT session_id, account_id, namespace, title_id, endpoint_ref
-		FROM adapter_sessions WHERE account_id=$1 AND title_id=$2 AND expires_at > now()`,
+	err := s.pool.QueryRow(ctx, `SELECT s.session_id, s.account_id, s.namespace, s.title_id, s.endpoint_ref
+		FROM adapter_sessions s JOIN accounts a ON a.id = s.account_id
+		WHERE s.account_id=$1 AND s.title_id=$2 AND s.expires_at > now() AND a.status = 'active'`,
 		accountID, titleID).Scan(&sess.ID, &sess.AccountID, &sess.Namespace, &sess.TitleID, &sess.EndpointRef)
 	if errors.Is(err, pgx.ErrNoRows) {
-		_, _ = s.pool.Exec(ctx, `DELETE FROM adapter_sessions
-			WHERE account_id=$1 AND title_id=$2 AND expires_at <= now()`, accountID, titleID)
+		// Reap expired rows and invalidate rows of inactive owners.
+		_, _ = s.pool.Exec(ctx, `DELETE FROM adapter_sessions s USING accounts a
+			WHERE s.account_id=$1 AND s.title_id=$2
+			  AND (s.expires_at <= now() OR a.id = s.account_id AND a.status <> 'active')`,
+			accountID, titleID)
 		return nil, ErrNotFound
 	}
 	if err != nil {

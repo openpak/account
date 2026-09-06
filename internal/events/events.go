@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	accountv1 "openpak/account/proto/openpak/account/v1"
@@ -18,12 +19,29 @@ type Service struct {
 
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
-// Emit records one event. Callers inside an active transaction should use
-// EmitTx instead so events commit atomically with the state change.
+// Emit records one event on its own transaction.
 func (s *Service) Emit(ctx context.Context, typ, accountID, namespace, subjectID string) error {
-	_, err := s.pool.Exec(ctx, `INSERT INTO invalidation_events (event_id, type, account_id, namespace, subject_id)
-		VALUES (gen_random_uuid(), $1, $2, NULLIF($3,''), NULLIF($4,''))`, typ, accountID, namespace, subjectID)
-	if err != nil {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		return s.EmitTx(ctx, tx, typ, accountID, namespace, subjectID)
+	})
+}
+
+// EmitTx records one event inside the caller's transaction, atomically with
+// the state change it describes (review P1 #4). Version assignment takes a
+// row lock on the counter that is held until commit, so version order equals
+// commit order — a poller can never permanently skip an event (review P1 #3;
+// a plain sequence can commit v5 after v6, letting the poller's high-water
+// mark advance past it).
+func (s *Service) EmitTx(ctx context.Context, tx pgx.Tx, typ, accountID, namespace, subjectID string) error {
+	var version int64
+	if err := tx.QueryRow(ctx,
+		`UPDATE invalidation_event_counter SET n = n + 1 WHERE id = 1 RETURNING n`).Scan(&version); err != nil {
+		return fmt.Errorf("events: version: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO invalidation_events
+		(version, event_id, type, account_id, namespace, subject_id)
+		VALUES ($1, gen_random_uuid(), $2, $3, NULLIF($4,''), NULLIF($5,''))`,
+		version, typ, accountID, namespace, subjectID); err != nil {
 		return fmt.Errorf("events: emit: %w", err)
 	}
 	return nil

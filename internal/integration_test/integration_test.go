@@ -31,7 +31,7 @@ func newEnv(t *testing.T) (*identity.Service, *links.Service) {
 	t.Cleanup(pool.Close)
 	// Reset schema for isolation.
 	for _, ddl := range []string{
-		`DROP TABLE IF EXISTS sessions, lifecycle_tokens, adapter_links, accounts, adapter_credentials, friendships, account_blocks, adapter_sessions, invitations, schema_migrations, invalidation_events CASCADE; DROP SEQUENCE IF EXISTS invalidation_events_version_seq CASCADE`,
+		`DROP SCHEMA public CASCADE; CREATE SCHEMA public`,
 	} {
 		if _, err := pool.Exec(ctx, ddl); err != nil {
 			t.Fatalf("reset: %v", err)

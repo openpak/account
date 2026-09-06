@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
 var (
 	ErrInvalid       = errors.New("invitations: invalid request")
 	ErrSelfInvite    = errors.New("invitations: self-invite not permitted")
@@ -40,13 +41,13 @@ type SessionRef struct {
 }
 
 type Invitation struct {
-	ID             string
-	FromAccountID  string
+	ID              string
+	FromAccountID   string
 	FromDisplayName string
-	TitleID        string
-	Payload        []byte
-	Nonce          string
-	ExpiresAtUnix  int64
+	TitleID         string
+	Payload         []byte
+	Nonce           string
+	ExpiresAtUnix   int64
 }
 
 type Service struct {
@@ -163,4 +164,3 @@ func (s *Service) Poll(ctx context.Context, namespace, accountID string, limit i
 // ErrNotFound is returned by Send when callers need to probe session state
 // indirectly; the resolver returns its own sentinel otherwise.
 var ErrNotFound = errors.New("invitations: not found")
-

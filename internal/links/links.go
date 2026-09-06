@@ -35,9 +35,11 @@ type Link struct {
 	State     State
 }
 
-// Emitter records durable invalidation events; implemented by events.Service.
+// Emitter records durable invalidation events inside the caller's
+// transaction; implemented by events.Service. State changes and their
+// events commit atomically (review P1 #4).
 type Emitter interface {
-	Emit(ctx context.Context, typ, accountID, namespace, subjectID string) error
+	EmitTx(ctx context.Context, tx pgx.Tx, typ, accountID, namespace, subjectID string) error
 }
 
 type Service struct {
@@ -137,43 +139,55 @@ func (s *Service) Activate(ctx context.Context, linkID, idempotencyKey string) (
 }
 
 // Unlink moves an active/pending link to revoked. Idempotent when already
-// revoked. The adapter is responsible for revoking its own credentials
-// before/after calling this (see PRD §7 consistency rules).
+// revoked. The state change and its link_unlinked event commit in one
+// transaction: an emitter failure rolls the whole unlink back, so a retry
+// re-attempts both (review P1 #4). The adapter is responsible for revoking
+// its own credentials before/after calling this (see PRD §7).
 func (s *Service) Unlink(ctx context.Context, linkID, idempotencyKey string) (State, error) {
-	tag, err := s.pool.Exec(ctx, `UPDATE adapter_links SET state='revoking', updated_at=now(), idempotency_key=$2
-		WHERE id=$1 AND state IN ('pending','active')`, linkID, idempotencyKey)
-	if err != nil {
-		return "", err
-	}
-	if tag.RowsAffected() == 1 {
-		var accountID, namespace, subjectID string
-		if _, err := s.pool.Exec(ctx, `UPDATE adapter_links SET state='revoked', updated_at=now()
-			WHERE id=$1 AND state='revoking'`, linkID); err != nil {
-			return "", err
+	var result State
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE adapter_links SET state='revoking', updated_at=now(), idempotency_key=$2
+			WHERE id=$1 AND state IN ('pending','active')`, linkID, idempotencyKey)
+		if err != nil {
+			return err
 		}
-		if err := s.pool.QueryRow(ctx, `SELECT account_id, namespace, subject_id FROM adapter_links WHERE id=$1`, linkID).
-			Scan(&accountID, &namespace, &subjectID); err != nil {
-			return "", err
-		}
-		if s.emitter != nil {
-			if err := s.emitter.Emit(ctx, "link_unlinked", accountID, namespace, subjectID); err != nil {
-				return "", err
+		if tag.RowsAffected() == 1 {
+			var accountID, namespace, subjectID string
+			if err := tx.QueryRow(ctx, `SELECT account_id, namespace, subject_id FROM adapter_links WHERE id=$1`, linkID).
+				Scan(&accountID, &namespace, &subjectID); err != nil {
+				return err
 			}
+			if s.emitter != nil {
+				if err := s.emitter.EmitTx(ctx, tx, "link_unlinked", accountID, namespace, subjectID); err != nil {
+					return err
+				}
+			}
+			if _, err := tx.Exec(ctx, `UPDATE adapter_links SET state='revoked', updated_at=now()
+				WHERE id=$1 AND state='revoking'`, linkID); err != nil {
+				return err
+			}
+			result = Revoked
+			return nil
 		}
-		return Revoked, nil
-	}
-	var state State
-	err = s.pool.QueryRow(ctx, `SELECT state FROM adapter_links WHERE id=$1`, linkID).Scan(&state)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrNotFound
-	}
+		// Already transitioned: distinguish revoked (idempotent) from conflict.
+		var state State
+		err = tx.QueryRow(ctx, `SELECT state FROM adapter_links WHERE id=$1`, linkID).Scan(&state)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if state == Revoked {
+			result = Revoked
+			return nil
+		}
+		return ErrConflict
+	})
 	if err != nil {
 		return "", err
 	}
-	if state == Revoked {
-		return Revoked, nil
-	}
-	return "", ErrConflict
+	return result, nil
 }
 
 // GetBySubject returns the link for a namespace/subject, regardless of state.

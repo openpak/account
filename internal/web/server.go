@@ -3,7 +3,6 @@
 package web
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,13 +12,23 @@ import (
 	"openpak/account/internal/identity"
 )
 
+// MailSender is the outbound email transport (implemented by mailer.Mailer).
+type MailSender interface {
+	Send(to, subject, body string) error
+}
+
 type Server struct {
 	identity *identity.Service
+	mailer   MailSender // nil = development mode: tokens returned in responses
+	baseURL  string
 	mux      *http.ServeMux
 }
 
-func New(ident *identity.Service) *Server {
-	s := &Server{identity: ident, mux: http.NewServeMux()}
+func New(ident *identity.Service, mailer MailSender, baseURL string) *Server {
+	if baseURL == "" {
+		baseURL = "http://localhost:8000"
+	}
+	s := &Server{identity: ident, mailer: mailer, baseURL: baseURL, mux: http.NewServeMux()}
 	s.mux.HandleFunc("POST /v1/register", s.handleRegister)
 	s.mux.HandleFunc("GET /v1/verify", s.handleVerify)
 	s.mux.HandleFunc("POST /v1/login", s.handleLogin)
@@ -28,6 +37,8 @@ func New(ident *identity.Service) *Server {
 	s.mux.HandleFunc("DELETE /v1/sessions/{id}", s.auth(s.handleRevokeSession))
 	s.mux.HandleFunc("POST /v1/forgot-password", s.handleForgotPassword)
 	s.mux.HandleFunc("POST /v1/reset-password", s.handleResetPassword)
+	s.mux.HandleFunc("GET /v1/reset-password", s.handleResetPasswordPage)
+	s.mux.HandleFunc("POST /v1/reset-password/confirm", s.handleResetPasswordForm)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 	s.mux.HandleFunc("GET /readyz", s.handleHealth)
 	return s
@@ -78,16 +89,27 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	// TODO(M1.1): hand verifyToken to the mailer instead of the response
-	// once SMTP delivery is wired (FR-1). In development it is returned.
-	if isDevelopment(r) {
+	if s.mailer == nil {
+		// Development mode (no SMTP configured): surface the token so the
+		// flow is completable locally. Never happens in production wiring.
 		writeJSON(w, http.StatusCreated, map[string]any{"account_id": acct.ID, "verification_token": verifyToken})
+		return
+	}
+	if err := s.sendVerificationEmail(acct.Email, acct.DisplayName, verifyToken); err != nil {
+		// Registration succeeded but delivery failed: report so the caller
+		// can retry/resend rather than silently never verifying.
+		writeError(w, http.StatusInternalServerError, "account created but the verification email could not be sent")
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]string{"account_id": acct.ID})
 }
 
-func isDevelopment(r *http.Request) bool { return r.Host == "" } // refined with config in M1.1
+func (s *Server) sendVerificationEmail(to, displayName, token string) error {
+	link := s.baseURL + "/v1/verify?token=" + token
+	body := "Hi " + displayName + ",\n\nConfirm your OpenPak account email address:\n" + link +
+		"\n\nIf you did not create this account, ignore this message."
+	return s.mailer.Send(to, "Confirm your OpenPak email", body)
+}
 
 func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
@@ -130,26 +152,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
 	c, err := r.Cookie(sessionCookieName)
 	if err == nil && c.Value != "" {
-		// Best-effort revoke; the cookie is cleared regardless.
-		_ = revokeCurrent(s, r.Context(), c.Value)
+		// Revoke in storage BEFORE reporting success (review P1 #2).
+		if err := s.identity.RevokeByToken(r.Context(), c.Value); err != nil {
+			writeError(w, http.StatusInternalServerError, "could not sign out; session still active")
+			return
+		}
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1,
 		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	writeJSON(w, http.StatusOK, map[string]string{"message": "signed out"})
-}
-
-func revokeCurrent(s *Server, ctx context.Context, token string) error {
-	acct, err := s.identity.SessionAccount(ctx, token)
-	if err != nil {
-		return err
-	}
-	// Resolve session by token hash to its ID.
-	sessions, err := s.identity.ListSessions(ctx, acct.ID)
-	if err != nil {
-		return err
-	}
-	_ = sessions
-	return errors.New("not implemented: revoke by token requires session lookup (M1.1)")
 }
 
 func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
@@ -186,13 +197,66 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	// Same response whether or not the account exists (enumeration resistance).
-	// TODO(M1.1): mailer delivery.
-	if token != "" && r.URL.Query().Get("debug") == "1" {
-		writeJSON(w, http.StatusOK, map[string]string{"message": "reset requested", "debug_token": token})
-		return
+	// Same response whether or not the account exists (enumeration
+	// resistance). The reset token is NEVER returned in a response
+	// (review P0 #1); unauthenticated callers only ever receive this
+	// fixed message. Delivery goes to the registered address, when one
+	// exists, via the mailer.
+	if token != "" {
+		if err := s.sendPasswordResetEmail(req.Email, token); err != nil {
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "if the address is registered, a reset email has been sent"})
+}
+
+func (s *Server) sendPasswordResetEmail(to, token string) error {
+	link := s.baseURL + "/v1/reset-password?token=" + token
+	body := "A password reset was requested for your OpenPak account.\n\n" +
+		"Open this link to choose a new password:\n" + link +
+		"\n\nThe link expires in 24 hours and can be used once.\n" +
+		"If you did not request this, ignore this message; your password is unchanged."
+	return s.mailer.Send(to, "Reset your OpenPak password", body)
+}
+
+// handleResetPasswordPage renders the token-consuming reset form (FR-5
+// minimal recovery UI; the API JSON endpoint remains for API clients).
+func (s *Server) handleResetPasswordPage(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "token required")
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Reset password</title></head>
+<body><form method="post" action="/v1/reset-password/confirm">
+<h1>Choose a new password</h1>
+<input type="hidden" name="token" value="` + htmlEscape(token) + `">
+<label>New password <input type="password" name="password" minlength="8" required></label>
+<button type="submit">Reset password</button>
+</form></body></html>`))
+}
+
+// handleResetPasswordForm applies the reset from the HTML form and shows
+// the outcome as a page (never echoes the token).
+func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid form")
+		return
+	}
+	if err := s.identity.ResetPassword(r.Context(), r.PostFormValue("token"), r.PostFormValue("password")); err != nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<!DOCTYPE html><html lang="en"><body><p>This reset link is invalid or expired. Request a new one.</p></body></html>`))
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(`<!DOCTYPE html><html lang="en"><body><p>Password updated. You can now sign in.</p></body></html>`))
+}
+
+func htmlEscape(s string) string {
+	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&#34;", "'", "&#39;")
+	return r.Replace(s)
 }
 
 func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {

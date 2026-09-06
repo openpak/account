@@ -22,7 +22,8 @@ func authCtx() context.Context {
 
 func pair(t *testing.T, ident interface {
 	Register(ctx interface{ Done() <-chan struct{} }, a, b, c string) (interface{ GetID() string }, string, error)
-}) {}
+}) {
+}
 
 func TestSocialFriendLifecycle(t *testing.T) {
 	_, _, soc, _, _, ident := startGRPC(t)
@@ -269,7 +270,6 @@ func TestInvitationFlow(t *testing.T) {
 	if err != nil || len(got.Invitations) != 0 {
 		t.Fatalf("replay poll: %+v %v", got, err)
 	}
-
 
 	// Validation: oversized payload and bad TTL are InvalidArgument.
 	big := strings.Repeat("x", 4097)

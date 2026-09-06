@@ -78,8 +78,11 @@ func (s *Service) RequestFriend(ctx context.Context, requesterID, addresseeID, i
 		return nil, err
 	}
 
-	// Same-direction row wins; a reverse pending request is surfaced so the
-	// adapter can offer accept instead of a duplicate request.
+	// Canonical pair rule (review P2 #7): one relationship row per unordered
+	// pair, enforced by friendships_unordered_active for non-removed states.
+	// Any active row in EITHER direction is the relationship.
+
+	// Active same-direction row: idempotent.
 	var id string
 	var state State
 	err = tx.QueryRow(ctx, `SELECT id, state FROM friendships
@@ -91,15 +94,22 @@ func (s *Service) RequestFriend(ctx context.Context, requesterID, addresseeID, i
 	case !errors.Is(err, pgx.ErrNoRows):
 		return nil, err
 	}
-	err = tx.QueryRow(ctx, `SELECT true FROM friendships
-		WHERE requester_id=$1 AND addressee_id=$2 AND state='pending'`, addresseeID, requesterID).Scan(new(bool))
-	if err == nil {
+	// Active reverse-direction row: pending → surface for accept;
+	// accepted → they are already friends (idempotent success).
+	err = tx.QueryRow(ctx, `SELECT id, state FROM friendships
+		WHERE requester_id=$1 AND addressee_id=$2 AND state IN ('pending','accepted')
+		FOR UPDATE`, addresseeID, requesterID).Scan(&id, &state)
+	switch {
+	case err == nil && state == Accepted:
+		return &Friendship{ID: id, State: Accepted, WithID: addresseeID}, tx.Commit(ctx)
+	case err == nil:
 		return nil, ErrReversePending
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	case !errors.Is(err, pgx.ErrNoRows):
 		return nil, err
 	}
 
+	// No active rows either direction: re-open this direction's removed row,
+	// or insert fresh. The partial unique index guards concurrent racers.
 	f := &Friendship{ID: newUUID(), State: Pending, WithID: addresseeID}
 	tag, err := tx.Exec(ctx, `INSERT INTO friendships (id, requester_id, addressee_id, state, idempotency_key)
 		VALUES ($1,$2,$3,'pending',$4)
@@ -213,9 +223,14 @@ func (s *Service) GetRelationship(ctx context.Context, accountID, otherID string
 	if bOther {
 		return RelBlockedByOther, nil
 	}
+	// Deterministic row selection (review P2 #7): newest row for the pair —
+	// legacy trees may hold removed rows in both directions alongside the
+	// live one; the newest must win, never an arbitrary scan order.
 	var state State
 	err := s.pool.QueryRow(ctx, `SELECT state FROM friendships
-		WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)`,
+		WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)
+		ORDER BY updated_at DESC, created_at DESC
+		LIMIT 1`,
 		accountID, otherID).Scan(&state)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
@@ -228,7 +243,9 @@ func (s *Service) GetRelationship(ctx context.Context, accountID, otherID string
 		// Direction: pending row with requester=account is outgoing.
 		var outgoing bool
 		if err := s.pool.QueryRow(ctx, `SELECT requester_id=$1 FROM friendships
-			WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)`,
+			WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)
+			ORDER BY updated_at DESC, created_at DESC
+			LIMIT 1`,
 			accountID, otherID).Scan(&outgoing); err != nil {
 			return RelNone, err
 		}

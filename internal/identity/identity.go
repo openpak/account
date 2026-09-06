@@ -54,9 +54,10 @@ type Account struct {
 	CreatedAt     time.Time
 }
 
-// Emitter records durable invalidation events; implemented by events.Service.
+// Emitter records durable invalidation events inside the caller's
+// transaction; implemented by events.Service.
 type Emitter interface {
-	Emit(ctx context.Context, typ, accountID, namespace, subjectID string) error
+	EmitTx(ctx context.Context, tx pgx.Tx, typ, accountID, namespace, subjectID string) error
 }
 
 type Service struct {
@@ -425,49 +426,64 @@ func (s *Service) VerifyByID(ctx context.Context, accountID, password string) (*
 // revokes all active web sessions immediately.
 func (s *Service) SetBanned(ctx context.Context, accountID string, banned bool) error {
 	status := "active"
-	if banned {
-		status = "banned"
-	}
-	tag, err := s.pool.Exec(ctx, `UPDATE accounts SET status=$2, updated_at=now() WHERE id=$1 AND status <> 'deleted'`, accountID, status)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	if banned {
-		if _, err := s.pool.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE account_id=$1 AND revoked_at IS NULL`, accountID); err != nil {
-			return err
-		}
-	}
 	typ := "account_unbanned"
 	if banned {
+		status = "banned"
 		typ = "account_banned"
 	}
-	if s.emitter != nil {
-		if err := s.emitter.Emit(ctx, typ, accountID, "", ""); err != nil {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE accounts SET status=$2, updated_at=now() WHERE id=$1 AND status <> 'deleted'`, accountID, status)
+		if err != nil {
 			return err
 		}
-	}
-	return nil
+		if tag.RowsAffected() == 0 {
+			return ErrNotFound
+		}
+		if banned {
+			if _, err := tx.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE account_id=$1 AND revoked_at IS NULL`, accountID); err != nil {
+				return err
+			}
+		}
+		if s.emitter != nil {
+			return s.emitter.EmitTx(ctx, tx, typ, accountID, "", "")
+		}
+		return nil
+	})
 }
 
 // RequestDeletion marks an account deletion-pending (FR-8 first stage):
 // immediate access disable, session revocation, durable event.
 func (s *Service) RequestDeletion(ctx context.Context, accountID string) error {
-	tag, err := s.pool.Exec(ctx, `UPDATE accounts SET status='deletion_pending', updated_at=now()
-		WHERE id=$1 AND status IN ('active','banned')`, accountID)
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE accounts SET status='deletion_pending', updated_at=now()
+			WHERE id=$1 AND status IN ('active','banned')`, accountID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrNotFound
+		}
+		if _, err := tx.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE account_id=$1 AND revoked_at IS NULL`, accountID); err != nil {
+			return err
+		}
+		if s.emitter != nil {
+			return s.emitter.EmitTx(ctx, tx, "account_delete_started", accountID, "", "")
+		}
+		return nil
+	})
+}
+
+// RevokeByToken revokes the session identified by its raw token. Used by
+// logout: the session must be dead in storage before success is reported.
+func (s *Service) RevokeByToken(ctx context.Context, token string) error {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE sessions SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL`,
+		hashToken(token, s.pepper))
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
-	}
-	if _, err := s.pool.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE account_id=$1 AND revoked_at IS NULL`, accountID); err != nil {
-		return err
-	}
-	if s.emitter != nil {
-		return s.emitter.Emit(ctx, "account_delete_started", accountID, "", "")
 	}
 	return nil
 }

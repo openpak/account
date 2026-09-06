@@ -21,7 +21,7 @@ func TestInvalidationEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	if _, err := pool.Exec(ctx, `DROP TABLE IF EXISTS sessions, lifecycle_tokens, adapter_links, accounts, adapter_credentials, friendships, account_blocks, adapter_sessions, invitations, schema_migrations, invalidation_events CASCADE; DROP SEQUENCE IF EXISTS invalidation_events_version_seq CASCADE`); err != nil {
+	if _, err := pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public`); err != nil {
 		t.Fatal(err)
 	}
 	if err := storage.Migrate(ctx, pool); err != nil {
