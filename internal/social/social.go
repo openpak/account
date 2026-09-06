@@ -223,12 +223,15 @@ func (s *Service) GetRelationship(ctx context.Context, accountID, otherID string
 	if bOther {
 		return RelBlockedByOther, nil
 	}
-	// Deterministic row selection (review P2 #7): newest row for the pair —
-	// legacy trees may hold removed rows in both directions alongside the
-	// live one; the newest must win, never an arbitrary scan order.
+	// Deterministic row selection (review P2 #7 + follow-up): the LIVE
+	// relationship is the pair's non-removed row. Removed rows must never
+	// shadow it — migration dedupe stamps them with updated_at=now(), which
+	// would otherwise win a newest-row sort and report RelNone while
+	// CheckInteraction sees an accepted friendship.
 	var state State
 	err := s.pool.QueryRow(ctx, `SELECT state FROM friendships
-		WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)
+		WHERE state <> 'removed'
+		  AND ((requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1))
 		ORDER BY updated_at DESC, created_at DESC
 		LIMIT 1`,
 		accountID, otherID).Scan(&state)
@@ -243,7 +246,8 @@ func (s *Service) GetRelationship(ctx context.Context, accountID, otherID string
 		// Direction: pending row with requester=account is outgoing.
 		var outgoing bool
 		if err := s.pool.QueryRow(ctx, `SELECT requester_id=$1 FROM friendships
-			WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)
+			WHERE state <> 'removed'
+			  AND ((requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1))
 			ORDER BY updated_at DESC, created_at DESC
 			LIMIT 1`,
 			accountID, otherID).Scan(&outgoing); err != nil {

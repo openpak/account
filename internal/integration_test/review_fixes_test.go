@@ -48,28 +48,38 @@ func newEnvAll(t *testing.T) (*identity.Service, *links.Service, *events.Service
 
 // --- P0 #1 + P1 #6: web flows never leak tokens; emails actually send ---
 
-type recordingMailer struct {
-	sent []string
-	fail bool
-}
-
-func (m *recordingMailer) Send(to, subject, body string) error {
-	if m.fail {
-		return errors.New("smtp down")
-	}
-	m.sent = append(m.sent, to+"|"+subject)
-	return nil
-}
-
-func newWebServer(t *testing.T, ident *identity.Service, m web.MailSender) (*web.Server, *recordingMailer) {
-	t.Helper()
-	rec := &recordingMailer{}
-	if m != nil {
-		if r, ok := m.(*recordingMailer); ok {
-			rec = r
+// newRecordingMailer returns a *mailer.Mailer fake that records sends; the
+// concrete type mirrors production wiring so typed-nil hazards stay covered.
+func newRecordingMailer() (m *mailer.Mailer, sent *[]string, fail *bool) {
+	sentList := &[]string{}
+	failFlag := false
+	m = mailer.NewFunc(func(to, subject, body string) error {
+		if failFlag {
+			return errors.New("smtp down")
 		}
+		*sentList = append(*sentList, to+"|"+subject)
+		return nil
+	})
+	return m, sentList, &failFlag
+}
+
+func newWebServer(t *testing.T, ident *identity.Service, m *mailer.Mailer) (*web.Server, *[]string, *bool) {
+	t.Helper()
+	rec := &[]string{}
+	failFlag := false
+	if m == nil {
+		// Recording fake so tests can assert deliveries; handles returned.
+		m = mailer.NewFunc(func(to, subject, body string) error {
+			if failFlag {
+				return errors.New("smtp down")
+			}
+			*rec = append(*rec, to+"|"+subject)
+			return nil
+		})
+		return web.New(ident, m, "https://accounts.test"), rec, &failFlag
 	}
-	return web.New(ident, m, "https://accounts.test"), rec
+	// Caller supplied their own fake; they assert against it directly.
+	return web.New(ident, m, "https://accounts.test"), nil, nil
 }
 
 func postJSON(t *testing.T, h http.Handler, path, body string) *httptest.ResponseRecorder {
@@ -83,7 +93,7 @@ func postJSON(t *testing.T, h http.Handler, path, body string) *httptest.Respons
 
 func TestReviewWebTokenLeakAndDelivery(t *testing.T) {
 	ident, _, _, _, _ := newEnvAll(t)
-	srv, mailer := newWebServer(t, ident, &recordingMailer{})
+	srv, sent, _ := newWebServer(t, ident, nil)
 
 	// Register through the public API: email must be sent, token must NOT
 	// appear in the response (P0 #1 / P1 #6). Success and duplicate paths
@@ -95,8 +105,8 @@ func TestReviewWebTokenLeakAndDelivery(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "verification_token") {
 		t.Fatal("verification token leaked in response")
 	}
-	if len(mailer.sent) != 1 || !strings.HasPrefix(mailer.sent[0], "leak@example.com|") {
-		t.Fatalf("verification email not sent: %v", mailer.sent)
+	if len(*sent) != 1 || !strings.HasPrefix((*sent)[0], "leak@example.com|") {
+		t.Fatalf("verification email not sent: %v", *sent)
 	}
 
 	// Forgot-password: debug=1 must not leak a reset token (P0 #1).
@@ -107,8 +117,8 @@ func TestReviewWebTokenLeakAndDelivery(t *testing.T) {
 	if strings.Contains(strings.ToLower(rec.Body.String()), "token") {
 		t.Fatalf("reset token leaked: %s", rec.Body.String())
 	}
-	if len(mailer.sent) != 2 || !strings.Contains(mailer.sent[1], "Reset your OpenPak password") {
-		t.Fatalf("reset email not sent: %v", mailer.sent)
+	if len(*sent) != 2 || !strings.Contains((*sent)[1], "Reset your OpenPak password") {
+		t.Fatalf("reset email not sent: %v", *sent)
 	}
 
 	// The emailed link works end to end: extract token from the mail body
@@ -121,7 +131,7 @@ func TestReviewWebTokenLeakAndDelivery(t *testing.T) {
 
 func TestReviewLogoutRevokes(t *testing.T) {
 	ident, _, _, _, _ := newEnvAll(t)
-	srv, _ := newWebServer(t, ident, &recordingMailer{})
+	srv, _, _ := newWebServer(t, ident, nil)
 
 	// Register + verify via service (dev mailer nil path not needed here).
 	_, _, err := ident.Register(context.Background(), "logout@example.com", "correct horse battery", "L")

@@ -76,7 +76,8 @@ func run() error {
 	sessSvc := sessions.New(pool)
 	invSvc := invitations.New(pool, socSvc, sessionRefResolver{sessSvc})
 
-	// gRPC internal API.
+	// Outbound email. Production REQUIRES SMTP configuration: registration
+	// and recovery are undeliverable without it (review follow-up P1 #1).
 	var m *mailer.Mailer
 	if os.Getenv("ACCOUNT_SMTP_HOST") != "" {
 		port := 587
@@ -90,6 +91,8 @@ func run() error {
 			Username: os.Getenv("ACCOUNT_SMTP_USERNAME"), Password: os.Getenv("ACCOUNT_SMTP_PASSWORD"),
 			From: os.Getenv("ACCOUNT_SMTP_FROM"), NoTLSForLocalhost: cfg.Environment == "development",
 		})
+	} else if cfg.Environment == "production" {
+		return errors.New("ACCOUNT_SMTP_HOST is required when ACCOUNT_ENVIRONMENT=production")
 	}
 	internalKey := os.Getenv("ACCOUNT_INTERNAL_KEY")
 	if len(internalKey) < 32 {

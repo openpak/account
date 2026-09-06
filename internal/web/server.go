@@ -10,25 +10,24 @@ import (
 	"time"
 
 	"openpak/account/internal/identity"
+	"openpak/account/internal/mailer"
 )
-
-// MailSender is the outbound email transport (implemented by mailer.Mailer).
-type MailSender interface {
-	Send(to, subject, body string) error
-}
 
 type Server struct {
 	identity *identity.Service
-	mailer   MailSender // nil = development mode: tokens returned in responses
-	baseURL  string
-	mux      *http.ServeMux
+	// mailer is concrete so a typed-nil (misconfigured wiring) compares nil
+	// and the guards hold; the interface form wrapped nil pointers into
+	// non-nil values and panicked (review follow-up P1 #1).
+	mailer  *mailer.Mailer // nil = development mode: tokens returned in responses
+	baseURL string
+	mux     *http.ServeMux
 }
 
-func New(ident *identity.Service, mailer MailSender, baseURL string) *Server {
+func New(ident *identity.Service, m *mailer.Mailer, baseURL string) *Server {
 	if baseURL == "" {
 		baseURL = "http://localhost:8000"
 	}
-	s := &Server{identity: ident, mailer: mailer, baseURL: baseURL, mux: http.NewServeMux()}
+	s := &Server{identity: ident, mailer: m, baseURL: baseURL, mux: http.NewServeMux()}
 	s.mux.HandleFunc("POST /v1/register", s.handleRegister)
 	s.mux.HandleFunc("GET /v1/verify", s.handleVerify)
 	s.mux.HandleFunc("POST /v1/login", s.handleLogin)

@@ -23,17 +23,26 @@ type Config struct {
 }
 
 type Mailer struct {
-	cfg Config
+	cfg  Config
+	send func(to, subject, body string) error
 }
 
 func New(cfg Config) *Mailer { return &Mailer{cfg: cfg} }
 
+// NewFunc returns a Mailer backed by an arbitrary send function (test
+// fakes, file/stdout development transports). A nil fn is a no-op mailer
+// that always succeeds.
+func NewFunc(fn func(to, subject, body string) error) *Mailer {
+	return &Mailer{cfg: Config{Host: "func", From: "func@local"}, send: fn}
+}
+
 func (m *Mailer) addr() string { return net.JoinHostPort(m.cfg.Host, fmt.Sprint(m.cfg.Port)) }
 
 // Send delivers a plaintext message. subject/body must not contain user
-// input unsanitized; callers pass fixed templates plus values.
+// input unsanitized; callers pass fixed templates plus values. Safe on a
+// nil receiver (review follow-up: typed-nil wiring must not panic).
 func (m *Mailer) Send(to, subject, body string) error {
-	if m.cfg.Host == "" || m.cfg.From == "" {
+	if m == nil || m.cfg.Host == "" || m.cfg.From == "" {
 		return errors.New("mailer: not configured")
 	}
 	from := m.cfg.From
@@ -46,6 +55,10 @@ func (m *Mailer) Send(to, subject, body string) error {
 		"Date: " + time.Now().Format(time.RFC1123Z),
 	}, "\r\n")
 	msg := []byte(headers + "\r\n\r\n" + body + "\r\n")
+
+	if m.send != nil {
+		return m.send(to, subject, body)
+	}
 
 	addr := m.addr()
 	host, _, _ := net.SplitHostPort(addr)

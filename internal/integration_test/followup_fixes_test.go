@@ -6,11 +6,14 @@ package integration_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"openpak/account/internal/events"
+	"openpak/account/internal/mailer"
+	"openpak/account/internal/social"
 	"openpak/account/internal/storage"
 	"openpak/account/migrations"
 )
@@ -22,7 +25,10 @@ func TestFollowupNoMailerNoPanic(t *testing.T) {
 	if _, _, err := ident.Register(context.Background(), "panic@example.com", "correct horse battery", "P"); err != nil {
 		t.Fatal(err)
 	}
-	srv, _ := newWebServer(t, ident, nil) // nil mailer = unconfigured SMTP
+	// Typed-nil *mailer.Mailer passed as the concrete param — exactly what
+	// main.go does with unset SMTP. The old interface wiring panicked here.
+	var typedNil *mailer.Mailer
+	srv, _, _ := newWebServer(t, ident, typedNil)
 	// Must not panic; must return the fixed message.
 	rec := postJSON(t, srv, "/v1/forgot-password", `{"email":"panic@example.com"}`)
 	if rec.Code != 200 {
@@ -42,8 +48,16 @@ func TestFollowupNoMailerNoPanic(t *testing.T) {
 // resend the verification email; enumeration-safe uniform responses.
 func TestFollowupResendOnRetry(t *testing.T) {
 	ident, _, _, _, _ := newEnvAll(t)
-	mail := &recordingMailer{fail: true} // first delivery fails
-	srv, _ := newWebServer(t, ident, mail)
+	sent := &[]string{}
+	fail := true
+	mail := mailer.NewFunc(func(to, subject, body string) error {
+		if fail {
+			return errors.New("smtp down")
+		}
+		*sent = append(*sent, to+"|"+subject)
+		return nil
+	})
+	srv, _, _ := newWebServer(t, ident, mail)
 
 	rec := postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"correct horse battery","display_name":"R"}`)
 	if rec.Code != 200 {
@@ -52,25 +66,25 @@ func TestFollowupResendOnRetry(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "account_id") || strings.Contains(rec.Body.String(), "token") {
 		t.Fatalf("response leaks registration state on delivery failure: %s", rec.Body.String())
 	}
-	if len(mail.sent) != 0 {
-		t.Fatalf("failed mailer recorded sends: %v", mail.sent)
+	if len(*sent) != 0 {
+		t.Fatalf("failed mailer recorded sends: %v", *sent)
 	}
 
 	// User retries registration (same email + same password): response
 	// identical, email now goes out (mailer recovered).
-	mail.fail = false
+	fail = false
 	rec = postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"correct horse battery","display_name":"R"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "verification email has been sent") {
 		t.Fatalf("retry register: %d %s", rec.Code, rec.Body.String())
 	}
-	if len(mail.sent) != 1 {
-		t.Fatalf("expected exactly 1 resend, got %v", mail.sent)
+	if len(*sent) != 1 {
+		t.Fatalf("expected exactly 1 resend, got %v", *sent)
 	}
 
 	// Wrong password on retry triggers NO delivery (anti mail-oracle).
 	rec = postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"wrong password 999","display_name":"R"}`)
-	if rec.Code != 200 || len(mail.sent) != 1 {
-		t.Fatalf("wrong-password retry must not send: %d %v", rec.Code, mail.sent)
+	if rec.Code != 200 || len(*sent) != 1 {
+		t.Fatalf("wrong-password retry must not send: %d %v", rec.Code, *sent)
 	}
 
 	// Rapid extra retries with correct creds are throttled (10 minutes).
@@ -78,8 +92,8 @@ func TestFollowupResendOnRetry(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("throttled retry: %d", rec.Code)
 	}
-	if len(mail.sent) != 1 {
-		t.Fatalf("rate limit failed: %v", mail.sent)
+	if len(*sent) != 1 {
+		t.Fatalf("rate limit failed: %v", *sent)
 	}
 
 	// The resent token verifies the account (single valid link).
@@ -179,4 +193,23 @@ func TestFollowupMigrationDedupesFriendships(t *testing.T) {
 	}
 	_ = events.Service{}
 	_ = n
+
+	// P2 follow-up: the dedupe stamps removed rows with updated_at=now();
+	// GetRelationship must not let that removed row shadow the surviving
+	// accepted relationship (newest-row sort would return it otherwise).
+	soc := social.New(pool)
+	rel, err := soc.GetRelationship(ctx, aID, bID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rel != social.RelFriends {
+		t.Fatalf("post-migration lookup must see the surviving friendship, got %v", rel)
+	}
+	rel, err = soc.GetRelationship(ctx, bID, aID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rel != social.RelFriends {
+		t.Fatalf("reverse viewpoint must also see the friendship, got %v", rel)
+	}
 }
