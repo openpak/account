@@ -451,3 +451,23 @@ func (s *Service) SetBanned(ctx context.Context, accountID string, banned bool) 
 	}
 	return nil
 }
+
+// RequestDeletion marks an account deletion-pending (FR-8 first stage):
+// immediate access disable, session revocation, durable event.
+func (s *Service) RequestDeletion(ctx context.Context, accountID string) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE accounts SET status='deletion_pending', updated_at=now()
+		WHERE id=$1 AND status IN ('active','banned')`, accountID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	if _, err := s.pool.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE account_id=$1 AND revoked_at IS NULL`, accountID); err != nil {
+		return err
+	}
+	if s.emitter != nil {
+		return s.emitter.Emit(ctx, "account_delete_started", accountID, "", "")
+	}
+	return nil
+}

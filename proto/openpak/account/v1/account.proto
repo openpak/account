@@ -17,6 +17,9 @@ service Identity {
   // Store an adapter-domain credential (e.g. a console's transformed
   // password hash). Separate domain from web passwords (FR-1/FR-3).
   rpc SetAdapterCredential(SetAdapterCredentialRequest) returns (SetAdapterCredentialResponse);
+  // Start account deletion (FR-8): disables access immediately, emits
+  // account_delete_started; full cleanup orchestration lands in M3/M4.
+  rpc RequestAccountDeletion(RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse);
   // Verify an adapter-domain credential. Never yields a web session.
   rpc VerifyAdapterCredential(VerifyAdapterCredentialRequest) returns (VerifyAdapterCredentialResponse);
   // Resolve an account by ID for status and minimal profile projection.
@@ -61,6 +64,14 @@ message SetAdapterCredentialRequest {
 }
 
 message SetAdapterCredentialResponse {}
+
+message RequestAccountDeletionRequest {
+  string caller_namespace = 1;
+  string purpose = 2;
+  string account_id = 3;
+}
+
+message RequestAccountDeletionResponse {}
 
 message VerifyAdapterCredentialRequest {
   string caller_namespace = 1;

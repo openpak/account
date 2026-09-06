@@ -22,6 +22,7 @@ const (
 	Identity_VerifyPassword_FullMethodName          = "/openpak.account.v1.Identity/VerifyPassword"
 	Identity_VerifyPasswordByID_FullMethodName      = "/openpak.account.v1.Identity/VerifyPasswordByID"
 	Identity_SetAdapterCredential_FullMethodName    = "/openpak.account.v1.Identity/SetAdapterCredential"
+	Identity_RequestAccountDeletion_FullMethodName  = "/openpak.account.v1.Identity/RequestAccountDeletion"
 	Identity_VerifyAdapterCredential_FullMethodName = "/openpak.account.v1.Identity/VerifyAdapterCredential"
 	Identity_GetAccount_FullMethodName              = "/openpak.account.v1.Identity/GetAccount"
 )
@@ -43,6 +44,9 @@ type IdentityClient interface {
 	// Store an adapter-domain credential (e.g. a console's transformed
 	// password hash). Separate domain from web passwords (FR-1/FR-3).
 	SetAdapterCredential(ctx context.Context, in *SetAdapterCredentialRequest, opts ...grpc.CallOption) (*SetAdapterCredentialResponse, error)
+	// Start account deletion (FR-8): disables access immediately, emits
+	// account_delete_started; full cleanup orchestration lands in M3/M4.
+	RequestAccountDeletion(ctx context.Context, in *RequestAccountDeletionRequest, opts ...grpc.CallOption) (*RequestAccountDeletionResponse, error)
 	// Verify an adapter-domain credential. Never yields a web session.
 	VerifyAdapterCredential(ctx context.Context, in *VerifyAdapterCredentialRequest, opts ...grpc.CallOption) (*VerifyAdapterCredentialResponse, error)
 	// Resolve an account by ID for status and minimal profile projection.
@@ -87,6 +91,16 @@ func (c *identityClient) SetAdapterCredential(ctx context.Context, in *SetAdapte
 	return out, nil
 }
 
+func (c *identityClient) RequestAccountDeletion(ctx context.Context, in *RequestAccountDeletionRequest, opts ...grpc.CallOption) (*RequestAccountDeletionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestAccountDeletionResponse)
+	err := c.cc.Invoke(ctx, Identity_RequestAccountDeletion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *identityClient) VerifyAdapterCredential(ctx context.Context, in *VerifyAdapterCredentialRequest, opts ...grpc.CallOption) (*VerifyAdapterCredentialResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VerifyAdapterCredentialResponse)
@@ -124,6 +138,9 @@ type IdentityServer interface {
 	// Store an adapter-domain credential (e.g. a console's transformed
 	// password hash). Separate domain from web passwords (FR-1/FR-3).
 	SetAdapterCredential(context.Context, *SetAdapterCredentialRequest) (*SetAdapterCredentialResponse, error)
+	// Start account deletion (FR-8): disables access immediately, emits
+	// account_delete_started; full cleanup orchestration lands in M3/M4.
+	RequestAccountDeletion(context.Context, *RequestAccountDeletionRequest) (*RequestAccountDeletionResponse, error)
 	// Verify an adapter-domain credential. Never yields a web session.
 	VerifyAdapterCredential(context.Context, *VerifyAdapterCredentialRequest) (*VerifyAdapterCredentialResponse, error)
 	// Resolve an account by ID for status and minimal profile projection.
@@ -146,6 +163,9 @@ func (UnimplementedIdentityServer) VerifyPasswordByID(context.Context, *VerifyPa
 }
 func (UnimplementedIdentityServer) SetAdapterCredential(context.Context, *SetAdapterCredentialRequest) (*SetAdapterCredentialResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetAdapterCredential not implemented")
+}
+func (UnimplementedIdentityServer) RequestAccountDeletion(context.Context, *RequestAccountDeletionRequest) (*RequestAccountDeletionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestAccountDeletion not implemented")
 }
 func (UnimplementedIdentityServer) VerifyAdapterCredential(context.Context, *VerifyAdapterCredentialRequest) (*VerifyAdapterCredentialResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method VerifyAdapterCredential not implemented")
@@ -228,6 +248,24 @@ func _Identity_SetAdapterCredential_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Identity_RequestAccountDeletion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestAccountDeletionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServer).RequestAccountDeletion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Identity_RequestAccountDeletion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServer).RequestAccountDeletion(ctx, req.(*RequestAccountDeletionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Identity_VerifyAdapterCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VerifyAdapterCredentialRequest)
 	if err := dec(in); err != nil {
@@ -282,6 +320,10 @@ var Identity_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetAdapterCredential",
 			Handler:    _Identity_SetAdapterCredential_Handler,
+		},
+		{
+			MethodName: "RequestAccountDeletion",
+			Handler:    _Identity_RequestAccountDeletion_Handler,
 		},
 		{
 			MethodName: "VerifyAdapterCredential",
