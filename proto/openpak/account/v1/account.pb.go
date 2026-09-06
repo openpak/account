@@ -131,6 +131,74 @@ func (LinkState) EnumDescriptor() ([]byte, []int) {
 	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{1}
 }
 
+type VerifyPasswordByIDRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CallerNamespace string                 `protobuf:"bytes,1,opt,name=caller_namespace,json=callerNamespace,proto3" json:"caller_namespace,omitempty"`
+	Purpose         string                 `protobuf:"bytes,2,opt,name=purpose,proto3" json:"purpose,omitempty"`
+	AccountId       string                 `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Password        string                 `protobuf:"bytes,4,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *VerifyPasswordByIDRequest) Reset() {
+	*x = VerifyPasswordByIDRequest{}
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyPasswordByIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyPasswordByIDRequest) ProtoMessage() {}
+
+func (x *VerifyPasswordByIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyPasswordByIDRequest.ProtoReflect.Descriptor instead.
+func (*VerifyPasswordByIDRequest) Descriptor() ([]byte, []int) {
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *VerifyPasswordByIDRequest) GetCallerNamespace() string {
+	if x != nil {
+		return x.CallerNamespace
+	}
+	return ""
+}
+
+func (x *VerifyPasswordByIDRequest) GetPurpose() string {
+	if x != nil {
+		return x.Purpose
+	}
+	return ""
+}
+
+func (x *VerifyPasswordByIDRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *VerifyPasswordByIDRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
 type VerifyPasswordRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	CallerNamespace string                 `protobuf:"bytes,1,opt,name=caller_namespace,json=callerNamespace,proto3" json:"caller_namespace,omitempty"` // adapter namespace requesting verification
@@ -143,7 +211,7 @@ type VerifyPasswordRequest struct {
 
 func (x *VerifyPasswordRequest) Reset() {
 	*x = VerifyPasswordRequest{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[0]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -155,7 +223,7 @@ func (x *VerifyPasswordRequest) String() string {
 func (*VerifyPasswordRequest) ProtoMessage() {}
 
 func (x *VerifyPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[0]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -168,7 +236,7 @@ func (x *VerifyPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyPasswordRequest.ProtoReflect.Descriptor instead.
 func (*VerifyPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{0}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *VerifyPasswordRequest) GetCallerNamespace() string {
@@ -210,7 +278,7 @@ type VerifyPasswordResponse struct {
 
 func (x *VerifyPasswordResponse) Reset() {
 	*x = VerifyPasswordResponse{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[1]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -222,7 +290,7 @@ func (x *VerifyPasswordResponse) String() string {
 func (*VerifyPasswordResponse) ProtoMessage() {}
 
 func (x *VerifyPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[1]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -235,7 +303,7 @@ func (x *VerifyPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyPasswordResponse.ProtoReflect.Descriptor instead.
 func (*VerifyPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{1}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *VerifyPasswordResponse) GetAccountId() string {
@@ -268,7 +336,7 @@ type GetAccountRequest struct {
 
 func (x *GetAccountRequest) Reset() {
 	*x = GetAccountRequest{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[2]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -280,7 +348,7 @@ func (x *GetAccountRequest) String() string {
 func (*GetAccountRequest) ProtoMessage() {}
 
 func (x *GetAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[2]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -293,7 +361,7 @@ func (x *GetAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAccountRequest.ProtoReflect.Descriptor instead.
 func (*GetAccountRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{2}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetAccountRequest) GetAccountId() string {
@@ -316,7 +384,7 @@ type GetAccountResponse struct {
 
 func (x *GetAccountResponse) Reset() {
 	*x = GetAccountResponse{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[3]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -328,7 +396,7 @@ func (x *GetAccountResponse) String() string {
 func (*GetAccountResponse) ProtoMessage() {}
 
 func (x *GetAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[3]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -341,7 +409,7 @@ func (x *GetAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAccountResponse.ProtoReflect.Descriptor instead.
 func (*GetAccountResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{3}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetAccountResponse) GetAccountId() string {
@@ -384,7 +452,7 @@ type ReserveLinkRequest struct {
 
 func (x *ReserveLinkRequest) Reset() {
 	*x = ReserveLinkRequest{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[4]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -396,7 +464,7 @@ func (x *ReserveLinkRequest) String() string {
 func (*ReserveLinkRequest) ProtoMessage() {}
 
 func (x *ReserveLinkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[4]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -409,7 +477,7 @@ func (x *ReserveLinkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReserveLinkRequest.ProtoReflect.Descriptor instead.
 func (*ReserveLinkRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{4}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ReserveLinkRequest) GetAccountId() string {
@@ -450,7 +518,7 @@ type ReserveLinkResponse struct {
 
 func (x *ReserveLinkResponse) Reset() {
 	*x = ReserveLinkResponse{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[5]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -462,7 +530,7 @@ func (x *ReserveLinkResponse) String() string {
 func (*ReserveLinkResponse) ProtoMessage() {}
 
 func (x *ReserveLinkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[5]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -475,7 +543,7 @@ func (x *ReserveLinkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReserveLinkResponse.ProtoReflect.Descriptor instead.
 func (*ReserveLinkResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{5}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ReserveLinkResponse) GetLinkId() string {
@@ -502,7 +570,7 @@ type ActivateLinkRequest struct {
 
 func (x *ActivateLinkRequest) Reset() {
 	*x = ActivateLinkRequest{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[6]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -514,7 +582,7 @@ func (x *ActivateLinkRequest) String() string {
 func (*ActivateLinkRequest) ProtoMessage() {}
 
 func (x *ActivateLinkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[6]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -527,7 +595,7 @@ func (x *ActivateLinkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivateLinkRequest.ProtoReflect.Descriptor instead.
 func (*ActivateLinkRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{6}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ActivateLinkRequest) GetLinkId() string {
@@ -553,7 +621,7 @@ type ActivateLinkResponse struct {
 
 func (x *ActivateLinkResponse) Reset() {
 	*x = ActivateLinkResponse{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[7]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -565,7 +633,7 @@ func (x *ActivateLinkResponse) String() string {
 func (*ActivateLinkResponse) ProtoMessage() {}
 
 func (x *ActivateLinkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[7]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -578,7 +646,7 @@ func (x *ActivateLinkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivateLinkResponse.ProtoReflect.Descriptor instead.
 func (*ActivateLinkResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{7}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ActivateLinkResponse) GetState() LinkState {
@@ -598,7 +666,7 @@ type UnlinkLinkRequest struct {
 
 func (x *UnlinkLinkRequest) Reset() {
 	*x = UnlinkLinkRequest{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[8]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -610,7 +678,7 @@ func (x *UnlinkLinkRequest) String() string {
 func (*UnlinkLinkRequest) ProtoMessage() {}
 
 func (x *UnlinkLinkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[8]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -623,7 +691,7 @@ func (x *UnlinkLinkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnlinkLinkRequest.ProtoReflect.Descriptor instead.
 func (*UnlinkLinkRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{8}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UnlinkLinkRequest) GetLinkId() string {
@@ -649,7 +717,7 @@ type UnlinkLinkResponse struct {
 
 func (x *UnlinkLinkResponse) Reset() {
 	*x = UnlinkLinkResponse{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[9]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -661,7 +729,7 @@ func (x *UnlinkLinkResponse) String() string {
 func (*UnlinkLinkResponse) ProtoMessage() {}
 
 func (x *UnlinkLinkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[9]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -674,7 +742,7 @@ func (x *UnlinkLinkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnlinkLinkResponse.ProtoReflect.Descriptor instead.
 func (*UnlinkLinkResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{9}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UnlinkLinkResponse) GetState() LinkState {
@@ -694,7 +762,7 @@ type GetLinkBySubjectRequest struct {
 
 func (x *GetLinkBySubjectRequest) Reset() {
 	*x = GetLinkBySubjectRequest{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[10]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -706,7 +774,7 @@ func (x *GetLinkBySubjectRequest) String() string {
 func (*GetLinkBySubjectRequest) ProtoMessage() {}
 
 func (x *GetLinkBySubjectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[10]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -719,7 +787,7 @@ func (x *GetLinkBySubjectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLinkBySubjectRequest.ProtoReflect.Descriptor instead.
 func (*GetLinkBySubjectRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{10}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetLinkBySubjectRequest) GetNamespace() string {
@@ -747,7 +815,7 @@ type GetLinkBySubjectResponse struct {
 
 func (x *GetLinkBySubjectResponse) Reset() {
 	*x = GetLinkBySubjectResponse{}
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[11]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -759,7 +827,7 @@ func (x *GetLinkBySubjectResponse) String() string {
 func (*GetLinkBySubjectResponse) ProtoMessage() {}
 
 func (x *GetLinkBySubjectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[11]
+	mi := &file_proto_openpak_account_v1_account_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -772,7 +840,7 @@ func (x *GetLinkBySubjectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLinkBySubjectResponse.ProtoReflect.Descriptor instead.
 func (*GetLinkBySubjectResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{11}
+	return file_proto_openpak_account_v1_account_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetLinkBySubjectResponse) GetLinkId() string {
@@ -800,7 +868,13 @@ var File_proto_openpak_account_v1_account_proto protoreflect.FileDescriptor
 
 const file_proto_openpak_account_v1_account_proto_rawDesc = "" +
 	"\n" +
-	"&proto/openpak/account/v1/account.proto\x12\x12openpak.account.v1\"\x8e\x01\n" +
+	"&proto/openpak/account/v1/account.proto\x12\x12openpak.account.v1\"\x9b\x01\n" +
+	"\x19VerifyPasswordByIDRequest\x12)\n" +
+	"\x10caller_namespace\x18\x01 \x01(\tR\x0fcallerNamespace\x12\x18\n" +
+	"\apurpose\x18\x02 \x01(\tR\apurpose\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x03 \x01(\tR\taccountId\x12\x1a\n" +
+	"\bpassword\x18\x04 \x01(\tR\bpassword\"\x8e\x01\n" +
 	"\x15VerifyPasswordRequest\x12)\n" +
 	"\x10caller_namespace\x18\x01 \x01(\tR\x0fcallerNamespace\x12\x18\n" +
 	"\apurpose\x18\x02 \x01(\tR\apurpose\x12\x14\n" +
@@ -860,9 +934,10 @@ const file_proto_openpak_account_v1_account_proto_rawDesc = "" +
 	"\x12LINK_STATE_PENDING\x10\x01\x12\x15\n" +
 	"\x11LINK_STATE_ACTIVE\x10\x02\x12\x17\n" +
 	"\x13LINK_STATE_REVOKING\x10\x03\x12\x16\n" +
-	"\x12LINK_STATE_REVOKED\x10\x042\xd0\x01\n" +
+	"\x12LINK_STATE_REVOKED\x10\x042\xc1\x02\n" +
 	"\bIdentity\x12g\n" +
-	"\x0eVerifyPassword\x12).openpak.account.v1.VerifyPasswordRequest\x1a*.openpak.account.v1.VerifyPasswordResponse\x12[\n" +
+	"\x0eVerifyPassword\x12).openpak.account.v1.VerifyPasswordRequest\x1a*.openpak.account.v1.VerifyPasswordResponse\x12o\n" +
+	"\x12VerifyPasswordByID\x12-.openpak.account.v1.VerifyPasswordByIDRequest\x1a*.openpak.account.v1.VerifyPasswordResponse\x12[\n" +
 	"\n" +
 	"GetAccount\x12%.openpak.account.v1.GetAccountRequest\x1a&.openpak.account.v1.GetAccountResponse2\x96\x03\n" +
 	"\x05Links\x12^\n" +
@@ -885,22 +960,23 @@ func file_proto_openpak_account_v1_account_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_openpak_account_v1_account_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_openpak_account_v1_account_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_proto_openpak_account_v1_account_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_proto_openpak_account_v1_account_proto_goTypes = []any{
-	(AccountStatus)(0),               // 0: openpak.account.v1.AccountStatus
-	(LinkState)(0),                   // 1: openpak.account.v1.LinkState
-	(*VerifyPasswordRequest)(nil),    // 2: openpak.account.v1.VerifyPasswordRequest
-	(*VerifyPasswordResponse)(nil),   // 3: openpak.account.v1.VerifyPasswordResponse
-	(*GetAccountRequest)(nil),        // 4: openpak.account.v1.GetAccountRequest
-	(*GetAccountResponse)(nil),       // 5: openpak.account.v1.GetAccountResponse
-	(*ReserveLinkRequest)(nil),       // 6: openpak.account.v1.ReserveLinkRequest
-	(*ReserveLinkResponse)(nil),      // 7: openpak.account.v1.ReserveLinkResponse
-	(*ActivateLinkRequest)(nil),      // 8: openpak.account.v1.ActivateLinkRequest
-	(*ActivateLinkResponse)(nil),     // 9: openpak.account.v1.ActivateLinkResponse
-	(*UnlinkLinkRequest)(nil),        // 10: openpak.account.v1.UnlinkLinkRequest
-	(*UnlinkLinkResponse)(nil),       // 11: openpak.account.v1.UnlinkLinkResponse
-	(*GetLinkBySubjectRequest)(nil),  // 12: openpak.account.v1.GetLinkBySubjectRequest
-	(*GetLinkBySubjectResponse)(nil), // 13: openpak.account.v1.GetLinkBySubjectResponse
+	(AccountStatus)(0),                // 0: openpak.account.v1.AccountStatus
+	(LinkState)(0),                    // 1: openpak.account.v1.LinkState
+	(*VerifyPasswordByIDRequest)(nil), // 2: openpak.account.v1.VerifyPasswordByIDRequest
+	(*VerifyPasswordRequest)(nil),     // 3: openpak.account.v1.VerifyPasswordRequest
+	(*VerifyPasswordResponse)(nil),    // 4: openpak.account.v1.VerifyPasswordResponse
+	(*GetAccountRequest)(nil),         // 5: openpak.account.v1.GetAccountRequest
+	(*GetAccountResponse)(nil),        // 6: openpak.account.v1.GetAccountResponse
+	(*ReserveLinkRequest)(nil),        // 7: openpak.account.v1.ReserveLinkRequest
+	(*ReserveLinkResponse)(nil),       // 8: openpak.account.v1.ReserveLinkResponse
+	(*ActivateLinkRequest)(nil),       // 9: openpak.account.v1.ActivateLinkRequest
+	(*ActivateLinkResponse)(nil),      // 10: openpak.account.v1.ActivateLinkResponse
+	(*UnlinkLinkRequest)(nil),         // 11: openpak.account.v1.UnlinkLinkRequest
+	(*UnlinkLinkResponse)(nil),        // 12: openpak.account.v1.UnlinkLinkResponse
+	(*GetLinkBySubjectRequest)(nil),   // 13: openpak.account.v1.GetLinkBySubjectRequest
+	(*GetLinkBySubjectResponse)(nil),  // 14: openpak.account.v1.GetLinkBySubjectResponse
 }
 var file_proto_openpak_account_v1_account_proto_depIdxs = []int32{
 	0,  // 0: openpak.account.v1.VerifyPasswordResponse.status:type_name -> openpak.account.v1.AccountStatus
@@ -909,20 +985,22 @@ var file_proto_openpak_account_v1_account_proto_depIdxs = []int32{
 	1,  // 3: openpak.account.v1.ActivateLinkResponse.state:type_name -> openpak.account.v1.LinkState
 	1,  // 4: openpak.account.v1.UnlinkLinkResponse.state:type_name -> openpak.account.v1.LinkState
 	1,  // 5: openpak.account.v1.GetLinkBySubjectResponse.state:type_name -> openpak.account.v1.LinkState
-	2,  // 6: openpak.account.v1.Identity.VerifyPassword:input_type -> openpak.account.v1.VerifyPasswordRequest
-	4,  // 7: openpak.account.v1.Identity.GetAccount:input_type -> openpak.account.v1.GetAccountRequest
-	6,  // 8: openpak.account.v1.Links.ReserveLink:input_type -> openpak.account.v1.ReserveLinkRequest
-	8,  // 9: openpak.account.v1.Links.ActivateLink:input_type -> openpak.account.v1.ActivateLinkRequest
-	10, // 10: openpak.account.v1.Links.UnlinkLink:input_type -> openpak.account.v1.UnlinkLinkRequest
-	12, // 11: openpak.account.v1.Links.GetLinkBySubject:input_type -> openpak.account.v1.GetLinkBySubjectRequest
-	3,  // 12: openpak.account.v1.Identity.VerifyPassword:output_type -> openpak.account.v1.VerifyPasswordResponse
-	5,  // 13: openpak.account.v1.Identity.GetAccount:output_type -> openpak.account.v1.GetAccountResponse
-	7,  // 14: openpak.account.v1.Links.ReserveLink:output_type -> openpak.account.v1.ReserveLinkResponse
-	9,  // 15: openpak.account.v1.Links.ActivateLink:output_type -> openpak.account.v1.ActivateLinkResponse
-	11, // 16: openpak.account.v1.Links.UnlinkLink:output_type -> openpak.account.v1.UnlinkLinkResponse
-	13, // 17: openpak.account.v1.Links.GetLinkBySubject:output_type -> openpak.account.v1.GetLinkBySubjectResponse
-	12, // [12:18] is the sub-list for method output_type
-	6,  // [6:12] is the sub-list for method input_type
+	3,  // 6: openpak.account.v1.Identity.VerifyPassword:input_type -> openpak.account.v1.VerifyPasswordRequest
+	2,  // 7: openpak.account.v1.Identity.VerifyPasswordByID:input_type -> openpak.account.v1.VerifyPasswordByIDRequest
+	5,  // 8: openpak.account.v1.Identity.GetAccount:input_type -> openpak.account.v1.GetAccountRequest
+	7,  // 9: openpak.account.v1.Links.ReserveLink:input_type -> openpak.account.v1.ReserveLinkRequest
+	9,  // 10: openpak.account.v1.Links.ActivateLink:input_type -> openpak.account.v1.ActivateLinkRequest
+	11, // 11: openpak.account.v1.Links.UnlinkLink:input_type -> openpak.account.v1.UnlinkLinkRequest
+	13, // 12: openpak.account.v1.Links.GetLinkBySubject:input_type -> openpak.account.v1.GetLinkBySubjectRequest
+	4,  // 13: openpak.account.v1.Identity.VerifyPassword:output_type -> openpak.account.v1.VerifyPasswordResponse
+	4,  // 14: openpak.account.v1.Identity.VerifyPasswordByID:output_type -> openpak.account.v1.VerifyPasswordResponse
+	6,  // 15: openpak.account.v1.Identity.GetAccount:output_type -> openpak.account.v1.GetAccountResponse
+	8,  // 16: openpak.account.v1.Links.ReserveLink:output_type -> openpak.account.v1.ReserveLinkResponse
+	10, // 17: openpak.account.v1.Links.ActivateLink:output_type -> openpak.account.v1.ActivateLinkResponse
+	12, // 18: openpak.account.v1.Links.UnlinkLink:output_type -> openpak.account.v1.UnlinkLinkResponse
+	14, // 19: openpak.account.v1.Links.GetLinkBySubject:output_type -> openpak.account.v1.GetLinkBySubjectResponse
+	13, // [13:20] is the sub-list for method output_type
+	6,  // [6:13] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -939,7 +1017,7 @@ func file_proto_openpak_account_v1_account_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_openpak_account_v1_account_proto_rawDesc), len(file_proto_openpak_account_v1_account_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

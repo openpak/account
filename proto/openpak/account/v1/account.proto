@@ -10,8 +10,19 @@ service Identity {
   // Verify an account's email+password. Returns a short-lived result bound to
   // the caller's namespace and purpose; never an unrestricted session.
   rpc VerifyPassword(VerifyPasswordRequest) returns (VerifyPasswordResponse);
+  // Verify by account ID, for adapters that resolve namespace subjects to
+  // core accounts themselves (console login uses adapter usernames, so the
+  // adapter maps subject→account and calls this).
+  rpc VerifyPasswordByID(VerifyPasswordByIDRequest) returns (VerifyPasswordResponse);
   // Resolve an account by ID for status and minimal profile projection.
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+}
+
+message VerifyPasswordByIDRequest {
+  string caller_namespace = 1;
+  string purpose = 2;
+  string account_id = 3;
+  string password = 4;
 }
 
 message VerifyPasswordRequest {

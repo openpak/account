@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Identity_VerifyPassword_FullMethodName = "/openpak.account.v1.Identity/VerifyPassword"
-	Identity_GetAccount_FullMethodName     = "/openpak.account.v1.Identity/GetAccount"
+	Identity_VerifyPassword_FullMethodName     = "/openpak.account.v1.Identity/VerifyPassword"
+	Identity_VerifyPasswordByID_FullMethodName = "/openpak.account.v1.Identity/VerifyPasswordByID"
+	Identity_GetAccount_FullMethodName         = "/openpak.account.v1.Identity/GetAccount"
 )
 
 // IdentityClient is the client API for Identity service.
@@ -33,6 +34,10 @@ type IdentityClient interface {
 	// Verify an account's email+password. Returns a short-lived result bound to
 	// the caller's namespace and purpose; never an unrestricted session.
 	VerifyPassword(ctx context.Context, in *VerifyPasswordRequest, opts ...grpc.CallOption) (*VerifyPasswordResponse, error)
+	// Verify by account ID, for adapters that resolve namespace subjects to
+	// core accounts themselves (console login uses adapter usernames, so the
+	// adapter maps subject→account and calls this).
+	VerifyPasswordByID(ctx context.Context, in *VerifyPasswordByIDRequest, opts ...grpc.CallOption) (*VerifyPasswordResponse, error)
 	// Resolve an account by ID for status and minimal profile projection.
 	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
 }
@@ -49,6 +54,16 @@ func (c *identityClient) VerifyPassword(ctx context.Context, in *VerifyPasswordR
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VerifyPasswordResponse)
 	err := c.cc.Invoke(ctx, Identity_VerifyPassword_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityClient) VerifyPasswordByID(ctx context.Context, in *VerifyPasswordByIDRequest, opts ...grpc.CallOption) (*VerifyPasswordResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyPasswordResponse)
+	err := c.cc.Invoke(ctx, Identity_VerifyPasswordByID_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +90,10 @@ type IdentityServer interface {
 	// Verify an account's email+password. Returns a short-lived result bound to
 	// the caller's namespace and purpose; never an unrestricted session.
 	VerifyPassword(context.Context, *VerifyPasswordRequest) (*VerifyPasswordResponse, error)
+	// Verify by account ID, for adapters that resolve namespace subjects to
+	// core accounts themselves (console login uses adapter usernames, so the
+	// adapter maps subject→account and calls this).
+	VerifyPasswordByID(context.Context, *VerifyPasswordByIDRequest) (*VerifyPasswordResponse, error)
 	// Resolve an account by ID for status and minimal profile projection.
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
 	mustEmbedUnimplementedIdentityServer()
@@ -89,6 +108,9 @@ type UnimplementedIdentityServer struct{}
 
 func (UnimplementedIdentityServer) VerifyPassword(context.Context, *VerifyPasswordRequest) (*VerifyPasswordResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method VerifyPassword not implemented")
+}
+func (UnimplementedIdentityServer) VerifyPasswordByID(context.Context, *VerifyPasswordByIDRequest) (*VerifyPasswordResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyPasswordByID not implemented")
 }
 func (UnimplementedIdentityServer) GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAccount not implemented")
@@ -132,6 +154,24 @@ func _Identity_VerifyPassword_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Identity_VerifyPasswordByID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyPasswordByIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServer).VerifyPasswordByID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Identity_VerifyPasswordByID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServer).VerifyPasswordByID(ctx, req.(*VerifyPasswordByIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Identity_GetAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAccountRequest)
 	if err := dec(in); err != nil {
@@ -160,6 +200,10 @@ var Identity_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VerifyPassword",
 			Handler:    _Identity_VerifyPassword_Handler,
+		},
+		{
+			MethodName: "VerifyPasswordByID",
+			Handler:    _Identity_VerifyPasswordByID_Handler,
 		},
 		{
 			MethodName: "GetAccount",
