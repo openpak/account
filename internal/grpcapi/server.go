@@ -15,8 +15,11 @@ import (
 
 	"openpak/account/internal/events"
 	"openpak/account/internal/identity"
+	"openpak/account/internal/invitations"
 	"openpak/account/internal/links"
 	"openpak/account/internal/mailer"
+	"openpak/account/internal/sessions"
+	"openpak/account/internal/social"
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
 
@@ -25,11 +28,17 @@ type Server struct {
 	accountv1.UnimplementedLinksServer
 	accountv1.UnimplementedEventsServer
 	accountv1.UnimplementedRegistrationServer
-	identity *identity.Service
-	links    *links.Service
-	events   *events.Service
-	mailer   *mailer.Mailer
-	baseURL  string
+	accountv1.UnimplementedSocialServer
+	accountv1.UnimplementedSessionsServer
+	accountv1.UnimplementedInvitationsServer
+	identity    *identity.Service
+	links       *links.Service
+	events      *events.Service
+	social      *social.Service
+	sessions    *sessions.Service
+	invitations *invitations.Service
+	mailer      *mailer.Mailer
+	baseURL     string
 }
 
 type Options struct {
@@ -37,11 +46,11 @@ type Options struct {
 	BaseURL string         // public web base URL for email links
 }
 
-func New(ident *identity.Service, lnks *links.Service, evs *events.Service, opts Options) *Server {
+func New(ident *identity.Service, lnks *links.Service, evs *events.Service, soc *social.Service, sess *sessions.Service, inv *invitations.Service, opts Options) *Server {
 	if opts.BaseURL == "" {
 		opts.BaseURL = "http://localhost:8000"
 	}
-	return &Server{identity: ident, links: lnks, events: evs, mailer: opts.Mailer, baseURL: opts.BaseURL}
+	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL}
 }
 
 func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsRequest) (*accountv1.PollEventsResponse, error) {

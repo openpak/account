@@ -21,12 +21,26 @@ import (
 	"openpak/account/internal/events"
 	"openpak/account/internal/grpcapi"
 	"openpak/account/internal/identity"
+	"openpak/account/internal/invitations"
 	"openpak/account/internal/links"
 	"openpak/account/internal/mailer"
+	"openpak/account/internal/sessions"
+	"openpak/account/internal/social"
 	"openpak/account/internal/storage"
 	"openpak/account/internal/web"
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
+
+// sessionRefResolver adapts sessions.Service to invitations.Resolver.
+type sessionRefResolver struct{ s *sessions.Service }
+
+func (r sessionRefResolver) Resolve(ctx context.Context, accountID, titleID string) (*invitations.SessionRef, error) {
+	sess, err := r.s.Resolve(ctx, accountID, titleID)
+	if err != nil {
+		return nil, err
+	}
+	return &invitations.SessionRef{ID: sess.ID, Namespace: sess.Namespace}, nil
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -58,6 +72,9 @@ func run() error {
 	evSvc := events.New(pool)
 	ident := identity.New(pool, cfg.SessionSecret, sessionTTL, evSvc)
 	lnks := links.New(pool, evSvc)
+	socSvc := social.New(pool)
+	sessSvc := sessions.New(pool)
+	invSvc := invitations.New(pool, socSvc, sessionRefResolver{sessSvc})
 
 	// gRPC internal API.
 	var m *mailer.Mailer
@@ -79,11 +96,14 @@ func run() error {
 		return errors.New("ACCOUNT_INTERNAL_KEY must be set (>=32 bytes); internal RPCs fail closed")
 	}
 	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(internalKey)))
-	apiSrv := grpcapi.New(ident, lnks, evSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL")})
+	apiSrv := grpcapi.New(ident, lnks, evSvc, socSvc, sessSvc, invSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL")})
 	accountv1.RegisterIdentityServer(grpcSrv, apiSrv)
 	accountv1.RegisterLinksServer(grpcSrv, apiSrv)
 	accountv1.RegisterEventsServer(grpcSrv, apiSrv)
 	accountv1.RegisterRegistrationServer(grpcSrv, apiSrv)
+	accountv1.RegisterSocialServer(grpcSrv, apiSrv)
+	accountv1.RegisterSessionsServer(grpcSrv, apiSrv)
+	accountv1.RegisterInvitationsServer(grpcSrv, apiSrv)
 	healthSrv := health.NewServer()
 	healthSrv.SetServingStatus("account", healthv1.HealthCheckResponse_SERVING)
 	healthv1.RegisterHealthServer(grpcSrv, healthSrv)

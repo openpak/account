@@ -16,14 +16,17 @@ import (
 	"openpak/account/internal/events"
 	"openpak/account/internal/grpcapi"
 	"openpak/account/internal/identity"
+	"openpak/account/internal/invitations"
 	"openpak/account/internal/links"
+	"openpak/account/internal/sessions"
+	"openpak/account/internal/social"
 	"openpak/account/internal/storage"
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
 
 const grpcInternalKey = "test-internal-key-0123456789abcdef0123456789"
 
-func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, *identity.Service) {
+func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, accountv1.SocialClient, accountv1.SessionsClient, accountv1.InvitationsClient, *identity.Service) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -41,13 +44,19 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, *
 	evSvc := events.New(pool)
 	ident := identity.New(pool, "test-pepper-0123456789abcdef0123456789abcdef", time.Hour, evSvc)
 	lnks := links.New(pool, evSvc)
+	soc := social.New(pool)
+	sessSvc := sessions.New(pool)
+	invSvc := invitations.New(pool, soc, testResolver{sessSvc})
 
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(grpcInternalKey)))
-	api := grpcapi.New(ident, lnks, evSvc, grpcapi.Options{})
+	api := grpcapi.New(ident, lnks, evSvc, soc, sessSvc, invSvc, grpcapi.Options{})
 	accountv1.RegisterIdentityServer(srv, api)
 	accountv1.RegisterLinksServer(srv, api)
 	accountv1.RegisterEventsServer(srv, api)
+	accountv1.RegisterSocialServer(srv, api)
+	accountv1.RegisterSessionsServer(srv, api)
+	accountv1.RegisterInvitationsServer(srv, api)
 	go srv.Serve(lis)
 	t.Cleanup(srv.Stop)
 
@@ -60,11 +69,25 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, *
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
-	return accountv1.NewIdentityClient(conn), accountv1.NewLinksClient(conn), ident
+	return accountv1.NewIdentityClient(conn), accountv1.NewLinksClient(conn),
+		accountv1.NewSocialClient(conn), accountv1.NewSessionsClient(conn),
+		accountv1.NewInvitationsClient(conn), ident
+}
+
+// testResolver adapts sessions.Service to invitations.Resolver (mirrors
+// cmd/account's sessionRefResolver).
+type testResolver struct{ s *sessions.Service }
+
+func (r testResolver) Resolve(ctx context.Context, accountID, titleID string) (*invitations.SessionRef, error) {
+	sess, err := r.s.Resolve(ctx, accountID, titleID)
+	if err != nil {
+		return nil, err
+	}
+	return &invitations.SessionRef{ID: sess.ID, Namespace: sess.Namespace}, nil
 }
 
 func TestGRPCAuthRequired(t *testing.T) {
-	idc, lc, _ := startGRPC(t)
+	idc, lc, _, _, _, _ := startGRPC(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	// No credentials → unauthenticated on every method.
@@ -82,7 +105,7 @@ func TestGRPCAuthRequired(t *testing.T) {
 }
 
 func TestGRPCLinkContract(t *testing.T) {
-	idc, lc, ident := startGRPC(t)
+	idc, lc, _, _, _, ident := startGRPC(t)
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", grpcInternalKey)
 
 	acct, _, err := ident.Register(ctx, "grpc@example.com", "correct horse battery", "G")

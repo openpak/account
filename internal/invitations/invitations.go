@@ -9,10 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
 var (
 	ErrInvalid       = errors.New("invitations: invalid request")
 	ErrSelfInvite    = errors.New("invitations: self-invite not permitted")
@@ -76,8 +74,9 @@ func (s *Service) Send(ctx context.Context, fromID, toID, titleID string, payloa
 	if ttl <= 0 || ttl > MaxTTL {
 		return nil, ErrInvalid
 	}
-	if allowed, _, err := s.check.CheckInteraction(ctx, fromID, toID); err != nil {
-		if errors.Is(err, ErrSelfInvite) {
+	allowed, reason, err := s.check.CheckInteraction(ctx, fromID, toID)
+	if err != nil {
+		if reason == "self" {
 			return nil, ErrSelfInvite
 		}
 		return nil, err
@@ -86,10 +85,8 @@ func (s *Service) Send(ctx context.Context, fromID, toID, titleID string, payloa
 	}
 	sess, err := s.resolve.Resolve(ctx, toID, titleID)
 	if err != nil {
-		if errors.Is(err, ErrNoLiveSession) || errors.Is(err, ErrNotFound) {
-			return nil, ErrNoLiveSession
-		}
-		return nil, err
+		// Any resolver failure means there is no deliverable live session.
+		return nil, ErrNoLiveSession
 	}
 	in := &Invitation{
 		FromAccountID: fromID,
@@ -163,5 +160,7 @@ func (s *Service) Poll(ctx context.Context, namespace, accountID string, limit i
 	return out, tx.Commit(ctx)
 }
 
+// ErrNotFound is returned by Send when callers need to probe session state
+// indirectly; the resolver returns its own sentinel otherwise.
 var ErrNotFound = errors.New("invitations: not found")
-var _ = pgx.ErrNoRows // keep pgx import stable across builds
+

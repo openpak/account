@@ -60,23 +60,16 @@ func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, e
 		return "", 0, ErrAccountUnknown
 	}
 	id := newUUID()
-	err := s.pool.QueryRow(ctx, `WITH replaced AS (
-			DELETE FROM adapter_sessions
-			WHERE account_id=$2 AND title_id=$3 AND expires_at <= now() RETURNING 1)
-		INSERT INTO adapter_sessions (session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
-		VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))
-		RETURNING extract(epoch FROM expires_at-now())::int`,
-		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds())).Scan(new(int))
-	if err != nil {
-		// Expired-row cleanup race is harmless; plain insert covers it.
-		tag, insertErr := s.pool.Exec(ctx, `INSERT INTO adapter_sessions
-			(session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
-			VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))`,
-			id, accountID, namespace, titleID, endpointRef, int(lease.Seconds()))
-		if insertErr != nil {
-			return "", 0, fmt.Errorf("sessions: register: %w", insertErr)
-		}
-		_ = tag
+	// Replace semantics: one live session per (account, title).
+	if _, err := s.pool.Exec(ctx, `DELETE FROM adapter_sessions
+		WHERE account_id=$1 AND title_id=$2`, accountID, titleID); err != nil {
+		return "", 0, err
+	}
+	if _, err := s.pool.Exec(ctx, `INSERT INTO adapter_sessions
+		(session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
+		VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))`,
+		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds())); err != nil {
+		return "", 0, fmt.Errorf("sessions: register: %w", err)
 	}
 	return id, lease, nil
 }
