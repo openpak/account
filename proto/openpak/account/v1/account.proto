@@ -14,6 +14,11 @@ service Identity {
   // core accounts themselves (console login uses adapter usernames, so the
   // adapter maps subject→account and calls this).
   rpc VerifyPasswordByID(VerifyPasswordByIDRequest) returns (VerifyPasswordResponse);
+  // Store an adapter-domain credential (e.g. a console's transformed
+  // password hash). Separate domain from web passwords (FR-1/FR-3).
+  rpc SetAdapterCredential(SetAdapterCredentialRequest) returns (SetAdapterCredentialResponse);
+  // Verify an adapter-domain credential. Never yields a web session.
+  rpc VerifyAdapterCredential(VerifyAdapterCredentialRequest) returns (VerifyAdapterCredentialResponse);
   // Resolve an account by ID for status and minimal profile projection.
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
 }
@@ -46,6 +51,27 @@ message GetAccountResponse {
   bool email_verified = 3;
   // Display name is the only profile field exposed internally.
   string display_name = 4;
+}
+
+message SetAdapterCredentialRequest {
+  string caller_namespace = 1;
+  string purpose = 2;
+  string account_id = 3;
+  string secret = 4; // adapter-forwarded secret; hashed server-side, never logged
+}
+
+message SetAdapterCredentialResponse {}
+
+message VerifyAdapterCredentialRequest {
+  string caller_namespace = 1;
+  string purpose = 2;
+  string account_id = 3;
+  string secret = 4;
+}
+
+message VerifyAdapterCredentialResponse {
+  bool valid = 1;
+  AccountStatus status = 2;
 }
 
 enum AccountStatus {

@@ -19,9 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Identity_VerifyPassword_FullMethodName     = "/openpak.account.v1.Identity/VerifyPassword"
-	Identity_VerifyPasswordByID_FullMethodName = "/openpak.account.v1.Identity/VerifyPasswordByID"
-	Identity_GetAccount_FullMethodName         = "/openpak.account.v1.Identity/GetAccount"
+	Identity_VerifyPassword_FullMethodName          = "/openpak.account.v1.Identity/VerifyPassword"
+	Identity_VerifyPasswordByID_FullMethodName      = "/openpak.account.v1.Identity/VerifyPasswordByID"
+	Identity_SetAdapterCredential_FullMethodName    = "/openpak.account.v1.Identity/SetAdapterCredential"
+	Identity_VerifyAdapterCredential_FullMethodName = "/openpak.account.v1.Identity/VerifyAdapterCredential"
+	Identity_GetAccount_FullMethodName              = "/openpak.account.v1.Identity/GetAccount"
 )
 
 // IdentityClient is the client API for Identity service.
@@ -38,6 +40,11 @@ type IdentityClient interface {
 	// core accounts themselves (console login uses adapter usernames, so the
 	// adapter maps subject→account and calls this).
 	VerifyPasswordByID(ctx context.Context, in *VerifyPasswordByIDRequest, opts ...grpc.CallOption) (*VerifyPasswordResponse, error)
+	// Store an adapter-domain credential (e.g. a console's transformed
+	// password hash). Separate domain from web passwords (FR-1/FR-3).
+	SetAdapterCredential(ctx context.Context, in *SetAdapterCredentialRequest, opts ...grpc.CallOption) (*SetAdapterCredentialResponse, error)
+	// Verify an adapter-domain credential. Never yields a web session.
+	VerifyAdapterCredential(ctx context.Context, in *VerifyAdapterCredentialRequest, opts ...grpc.CallOption) (*VerifyAdapterCredentialResponse, error)
 	// Resolve an account by ID for status and minimal profile projection.
 	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
 }
@@ -70,6 +77,26 @@ func (c *identityClient) VerifyPasswordByID(ctx context.Context, in *VerifyPassw
 	return out, nil
 }
 
+func (c *identityClient) SetAdapterCredential(ctx context.Context, in *SetAdapterCredentialRequest, opts ...grpc.CallOption) (*SetAdapterCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetAdapterCredentialResponse)
+	err := c.cc.Invoke(ctx, Identity_SetAdapterCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityClient) VerifyAdapterCredential(ctx context.Context, in *VerifyAdapterCredentialRequest, opts ...grpc.CallOption) (*VerifyAdapterCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyAdapterCredentialResponse)
+	err := c.cc.Invoke(ctx, Identity_VerifyAdapterCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *identityClient) GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetAccountResponse)
@@ -94,6 +121,11 @@ type IdentityServer interface {
 	// core accounts themselves (console login uses adapter usernames, so the
 	// adapter maps subject→account and calls this).
 	VerifyPasswordByID(context.Context, *VerifyPasswordByIDRequest) (*VerifyPasswordResponse, error)
+	// Store an adapter-domain credential (e.g. a console's transformed
+	// password hash). Separate domain from web passwords (FR-1/FR-3).
+	SetAdapterCredential(context.Context, *SetAdapterCredentialRequest) (*SetAdapterCredentialResponse, error)
+	// Verify an adapter-domain credential. Never yields a web session.
+	VerifyAdapterCredential(context.Context, *VerifyAdapterCredentialRequest) (*VerifyAdapterCredentialResponse, error)
 	// Resolve an account by ID for status and minimal profile projection.
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
 	mustEmbedUnimplementedIdentityServer()
@@ -111,6 +143,12 @@ func (UnimplementedIdentityServer) VerifyPassword(context.Context, *VerifyPasswo
 }
 func (UnimplementedIdentityServer) VerifyPasswordByID(context.Context, *VerifyPasswordByIDRequest) (*VerifyPasswordResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method VerifyPasswordByID not implemented")
+}
+func (UnimplementedIdentityServer) SetAdapterCredential(context.Context, *SetAdapterCredentialRequest) (*SetAdapterCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetAdapterCredential not implemented")
+}
+func (UnimplementedIdentityServer) VerifyAdapterCredential(context.Context, *VerifyAdapterCredentialRequest) (*VerifyAdapterCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyAdapterCredential not implemented")
 }
 func (UnimplementedIdentityServer) GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAccount not implemented")
@@ -172,6 +210,42 @@ func _Identity_VerifyPasswordByID_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Identity_SetAdapterCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetAdapterCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServer).SetAdapterCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Identity_SetAdapterCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServer).SetAdapterCredential(ctx, req.(*SetAdapterCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Identity_VerifyAdapterCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyAdapterCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServer).VerifyAdapterCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Identity_VerifyAdapterCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServer).VerifyAdapterCredential(ctx, req.(*VerifyAdapterCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Identity_GetAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAccountRequest)
 	if err := dec(in); err != nil {
@@ -204,6 +278,14 @@ var Identity_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VerifyPasswordByID",
 			Handler:    _Identity_VerifyPasswordByID_Handler,
+		},
+		{
+			MethodName: "SetAdapterCredential",
+			Handler:    _Identity_SetAdapterCredential_Handler,
+		},
+		{
+			MethodName: "VerifyAdapterCredential",
+			Handler:    _Identity_VerifyAdapterCredential_Handler,
 		},
 		{
 			MethodName: "GetAccount",
