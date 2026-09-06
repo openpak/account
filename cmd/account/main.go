@@ -16,13 +16,14 @@ import (
 	"google.golang.org/grpc/health"
 	healthv1 "google.golang.org/grpc/health/grpc_health_v1"
 
-	accountv1 "openpak/account/proto/openpak/account/v1"
 	"openpak/account/internal/config"
+	"openpak/account/internal/events"
 	"openpak/account/internal/grpcapi"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/links"
 	"openpak/account/internal/storage"
 	"openpak/account/internal/web"
+	accountv1 "openpak/account/proto/openpak/account/v1"
 )
 
 func main() {
@@ -52,8 +53,9 @@ func run() error {
 	if err != nil {
 		return errors.New("invalid ACCOUNT_SESSION_TTL: " + err.Error())
 	}
-	ident := identity.New(pool, cfg.SessionSecret, sessionTTL)
-	lnks := links.New(pool)
+	evSvc := events.New(pool)
+	ident := identity.New(pool, cfg.SessionSecret, sessionTTL, evSvc)
+	lnks := links.New(pool, evSvc)
 
 	// gRPC internal API.
 	internalKey := os.Getenv("ACCOUNT_INTERNAL_KEY")
@@ -61,9 +63,10 @@ func run() error {
 		return errors.New("ACCOUNT_INTERNAL_KEY must be set (>=32 bytes); internal RPCs fail closed")
 	}
 	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(internalKey)))
-	apiSrv := grpcapi.New(ident, lnks)
+	apiSrv := grpcapi.New(ident, lnks, evSvc)
 	accountv1.RegisterIdentityServer(grpcSrv, apiSrv)
 	accountv1.RegisterLinksServer(grpcSrv, apiSrv)
+	accountv1.RegisterEventsServer(grpcSrv, apiSrv)
 	healthSrv := health.NewServer()
 	healthSrv.SetServingStatus("account", healthv1.HealthCheckResponse_SERVING)
 	healthv1.RegisterHealthServer(grpcSrv, healthSrv)

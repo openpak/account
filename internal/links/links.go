@@ -35,11 +35,17 @@ type Link struct {
 	State     State
 }
 
-type Service struct {
-	pool *pgxpool.Pool
+// Emitter records durable invalidation events; implemented by events.Service.
+type Emitter interface {
+	Emit(ctx context.Context, typ, accountID, namespace, subjectID string) error
 }
 
-func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+type Service struct {
+	pool    *pgxpool.Pool
+	emitter Emitter
+}
+
+func New(pool *pgxpool.Pool, emitter Emitter) *Service { return &Service{pool: pool, emitter: emitter} }
 
 // Reserve claims a subject for an account. Idempotent by
 // (account, namespace, subject, key); a claim by a different account or an
@@ -140,9 +146,19 @@ func (s *Service) Unlink(ctx context.Context, linkID, idempotencyKey string) (St
 		return "", err
 	}
 	if tag.RowsAffected() == 1 {
+		var accountID, namespace, subjectID string
 		if _, err := s.pool.Exec(ctx, `UPDATE adapter_links SET state='revoked', updated_at=now()
 			WHERE id=$1 AND state='revoking'`, linkID); err != nil {
 			return "", err
+		}
+		if err := s.pool.QueryRow(ctx, `SELECT account_id, namespace, subject_id FROM adapter_links WHERE id=$1`, linkID).
+			Scan(&accountID, &namespace, &subjectID); err != nil {
+			return "", err
+		}
+		if s.emitter != nil {
+			if err := s.emitter.Emit(ctx, "link_unlinked", accountID, namespace, subjectID); err != nil {
+				return "", err
+			}
 		}
 		return Revoked, nil
 	}

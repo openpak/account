@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	accountv1 "openpak/account/proto/openpak/account/v1"
+	"openpak/account/internal/events"
 	"openpak/account/internal/grpcapi"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/links"
@@ -31,19 +32,22 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, *
 		t.Fatalf("connect: %v", err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(ctx, `DROP TABLE IF EXISTS sessions, lifecycle_tokens, adapter_links, accounts, schema_migrations CASCADE`); err != nil {
+	if _, err := pool.Exec(ctx, `DROP TABLE IF EXISTS sessions, lifecycle_tokens, adapter_links, accounts, schema_migrations, invalidation_events CASCADE; DROP SEQUENCE IF EXISTS invalidation_events_version_seq CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if err := storage.Migrate(ctx, pool); err != nil {
 		t.Fatal(err)
 	}
-	ident := identity.New(pool, "test-pepper-0123456789abcdef0123456789abcdef", time.Hour)
-	lnks := links.New(pool)
+	evSvc := events.New(pool)
+	ident := identity.New(pool, "test-pepper-0123456789abcdef0123456789abcdef", time.Hour, evSvc)
+	lnks := links.New(pool, evSvc)
 
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(grpcInternalKey)))
-	accountv1.RegisterIdentityServer(srv, grpcapi.New(ident, lnks))
-	accountv1.RegisterLinksServer(srv, grpcapi.New(ident, lnks))
+	api := grpcapi.New(ident, lnks, evSvc)
+	accountv1.RegisterIdentityServer(srv, api)
+	accountv1.RegisterLinksServer(srv, api)
+	accountv1.RegisterEventsServer(srv, api)
 	go srv.Serve(lis)
 	t.Cleanup(srv.Stop)
 

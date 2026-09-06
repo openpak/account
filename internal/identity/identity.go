@@ -54,14 +54,20 @@ type Account struct {
 	CreatedAt     time.Time
 }
 
+// Emitter records durable invalidation events; implemented by events.Service.
+type Emitter interface {
+	Emit(ctx context.Context, typ, accountID, namespace, subjectID string) error
+}
+
 type Service struct {
 	pool       *pgxpool.Pool
 	pepper     string
 	sessionTTL time.Duration
+	emitter    Emitter
 }
 
-func New(pool *pgxpool.Pool, pepper string, sessionTTL time.Duration) *Service {
-	return &Service{pool: pool, pepper: pepper, sessionTTL: sessionTTL}
+func New(pool *pgxpool.Pool, pepper string, sessionTTL time.Duration, emitter Emitter) *Service {
+	return &Service{pool: pool, pepper: pepper, sessionTTL: sessionTTL, emitter: emitter}
 }
 
 func normalizeEmail(email string) string {
@@ -368,3 +374,63 @@ func isUniqueViolation(err error) bool {
 
 // Pool exposes the storage pool for tests and future internal components.
 func (s *Service) Pool() *pgxpool.Pool { return s.pool }
+
+// VerifyByID checks a password for a known account ID (adapters resolve
+// namespace subjects to core account IDs themselves, then call this). Same
+// guarantees as VerifyCredentials: no session is created, failures are
+// indistinguishable between wrong password and disabled account only via the
+// returned error class.
+func (s *Service) VerifyByID(ctx context.Context, accountID, password string) (*Account, error) {
+	var id, hash string
+	var status Status
+	var verifiedAt *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at
+		FROM accounts WHERE id = $1`, accountID).
+		Scan(&id, &hash, &status, &verifiedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(password+pepperSuffix(s.pepper)))
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := mapStatusErr(status); err != nil {
+		return nil, err
+	}
+	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password+pepperSuffix(s.pepper))) != nil {
+		return nil, ErrBadCredentials
+	}
+	return &Account{ID: id, Status: status, EmailVerified: verifiedAt != nil}, nil
+}
+
+// SetBanned flips an account between active and banned and emits durable
+// invalidation events so adapters revoke credentials (FR-7, §7). Banning
+// revokes all active web sessions immediately.
+func (s *Service) SetBanned(ctx context.Context, accountID string, banned bool) error {
+	status := "active"
+	if banned {
+		status = "banned"
+	}
+	tag, err := s.pool.Exec(ctx, `UPDATE accounts SET status=$2, updated_at=now() WHERE id=$1 AND status <> 'deleted'`, accountID, status)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	if banned {
+		if _, err := s.pool.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE account_id=$1 AND revoked_at IS NULL`, accountID); err != nil {
+			return err
+		}
+	}
+	typ := "account_unbanned"
+	if banned {
+		typ = "account_banned"
+	}
+	if s.emitter != nil {
+		if err := s.emitter.Emit(ctx, typ, accountID, "", ""); err != nil {
+			return err
+		}
+	}
+	return nil
+}

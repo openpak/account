@@ -13,20 +13,30 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	accountv1 "openpak/account/proto/openpak/account/v1"
+	"openpak/account/internal/events"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/links"
+	accountv1 "openpak/account/proto/openpak/account/v1"
 )
 
 type Server struct {
 	accountv1.UnimplementedIdentityServer
 	accountv1.UnimplementedLinksServer
+	accountv1.UnimplementedEventsServer
 	identity *identity.Service
 	links    *links.Service
+	events   *events.Service
 }
 
-func New(ident *identity.Service, lnks *links.Service) *Server {
-	return &Server{identity: ident, links: lnks}
+func New(ident *identity.Service, lnks *links.Service, evs *events.Service) *Server {
+	return &Server{identity: ident, links: lnks, events: evs}
+}
+
+func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsRequest) (*accountv1.PollEventsResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	return s.events.Poll(ctx, req.GetSinceVersion(), req.GetLimit())
 }
 
 // Interceptor returns the server interceptor enforcing internal credentials.

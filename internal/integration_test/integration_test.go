@@ -31,7 +31,7 @@ func newEnv(t *testing.T) (*identity.Service, *links.Service) {
 	t.Cleanup(pool.Close)
 	// Reset schema for isolation.
 	for _, ddl := range []string{
-		`DROP TABLE IF EXISTS sessions, lifecycle_tokens, adapter_links, accounts, schema_migrations CASCADE`,
+		`DROP TABLE IF EXISTS sessions, lifecycle_tokens, adapter_links, accounts, schema_migrations, invalidation_events CASCADE; DROP SEQUENCE IF EXISTS invalidation_events_version_seq CASCADE`,
 	} {
 		if _, err := pool.Exec(ctx, ddl); err != nil {
 			t.Fatalf("reset: %v", err)
@@ -40,7 +40,7 @@ func newEnv(t *testing.T) (*identity.Service, *links.Service) {
 	if err := storage.Migrate(ctx, pool); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	return identity.New(pool, "test-pepper-0123456789abcdef0123456789abcdef", time.Hour), links.New(pool)
+	return identity.New(pool, "test-pepper-0123456789abcdef0123456789abcdef", time.Hour, nil), links.New(pool, nil)
 }
 
 func TestRegisterVerifyLogin(t *testing.T) {
