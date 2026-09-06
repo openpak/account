@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package openpak.account.v1;
+
+option go_package = "openpak/account/proto/openpak/account/v1;accountv1";
+
+// Internal identity contract: narrowly scoped verification and status.
+// Never exposes password hashes or recovery credentials.
+service Identity {
+  // Verify an account's email+password. Returns a short-lived result bound to
+  // the caller's namespace and purpose; never an unrestricted session.
+  rpc VerifyPassword(VerifyPasswordRequest) returns (VerifyPasswordResponse);
+  // Resolve an account by ID for status and minimal profile projection.
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+}
+
+message VerifyPasswordRequest {
+  string caller_namespace = 1; // adapter namespace requesting verification
+  string purpose = 2;          // e.g. "console_login", "link"
+  string email = 3;
+  string password = 4;
+}
+
+message VerifyPasswordResponse {
+  string account_id = 1;
+  AccountStatus status = 2;
+  bool email_verified = 3;
+}
+
+message GetAccountRequest { string account_id = 1; }
+
+message GetAccountResponse {
+  string account_id = 1;
+  AccountStatus status = 2;
+  bool email_verified = 3;
+  // Display name is the only profile field exposed internally.
+  string display_name = 4;
+}
+
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  ACCOUNT_STATUS_ACTIVE = 1;
+  ACCOUNT_STATUS_BANNED = 2;
+  ACCOUNT_STATUS_DELETION_PENDING = 3;
+  ACCOUNT_STATUS_DELETED = 4;
+}
+
+// Generic, console-neutral adapter links. The core stores the adapter
+// namespace and an opaque subject ID; it never interprets their contents.
+service Links {
+  // Reserve a subject for an account (state: pending). Idempotent per
+  // (namespace, subject_id); rejects conflicting account claims.
+  rpc ReserveLink(ReserveLinkRequest) returns (ReserveLinkResponse);
+  // Activate a pending reservation once the adapter has proven ownership
+  // (state: active). Fails if the reservation is not pending.
+  rpc ActivateLink(ActivateLinkRequest) returns (ActivateLinkResponse);
+  // Unlink (state: revoking, then revoked). Does not delete the account.
+  rpc UnlinkLink(UnlinkLinkRequest) returns (UnlinkLinkResponse);
+  // Look up the active link for an adapter subject.
+  rpc GetLinkBySubject(GetLinkBySubjectRequest) returns (GetLinkBySubjectResponse);
+}
+
+message ReserveLinkRequest {
+  string account_id = 1;
+  string namespace = 2;
+  string subject_id = 3;
+  string idempotency_key = 4;
+}
+
+message ReserveLinkResponse {
+  string link_id = 1;
+  LinkState state = 2;
+}
+
+message ActivateLinkRequest {
+  string link_id = 1;
+  string idempotency_key = 2;
+}
+
+message ActivateLinkResponse { LinkState state = 1; }
+
+message UnlinkLinkRequest {
+  string link_id = 1;
+  string idempotency_key = 2;
+}
+
+message UnlinkLinkResponse { LinkState state = 1; }
+
+message GetLinkBySubjectRequest {
+  string namespace = 1;
+  string subject_id = 2;
+}
+
+message GetLinkBySubjectResponse {
+  string link_id = 1;
+  string account_id = 2;
+  LinkState state = 3;
+}
+
+enum LinkState {
+  LINK_STATE_UNSPECIFIED = 0;
+  LINK_STATE_PENDING = 1;
+  LINK_STATE_ACTIVE = 2;
+  LINK_STATE_REVOKING = 3;
+  LINK_STATE_REVOKED = 4;
+}
