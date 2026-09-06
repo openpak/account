@@ -13,12 +13,12 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/test/bufconn"
 
-	accountv1 "openpak/account/proto/openpak/account/v1"
 	"openpak/account/internal/events"
 	"openpak/account/internal/grpcapi"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/links"
 	"openpak/account/internal/storage"
+	accountv1 "openpak/account/proto/openpak/account/v1"
 )
 
 const grpcInternalKey = "test-internal-key-0123456789abcdef0123456789"
@@ -44,7 +44,7 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, *
 
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(grpcInternalKey)))
-	api := grpcapi.New(ident, lnks, evSvc)
+	api := grpcapi.New(ident, lnks, evSvc, grpcapi.Options{})
 	accountv1.RegisterIdentityServer(srv, api)
 	accountv1.RegisterLinksServer(srv, api)
 	accountv1.RegisterEventsServer(srv, api)

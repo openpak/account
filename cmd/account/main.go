@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"openpak/account/internal/grpcapi"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/links"
+	"openpak/account/internal/mailer"
 	"openpak/account/internal/storage"
 	"openpak/account/internal/web"
 	accountv1 "openpak/account/proto/openpak/account/v1"
@@ -58,12 +60,26 @@ func run() error {
 	lnks := links.New(pool, evSvc)
 
 	// gRPC internal API.
+	var m *mailer.Mailer
+	if os.Getenv("ACCOUNT_SMTP_HOST") != "" {
+		port := 587
+		if v := os.Getenv("ACCOUNT_SMTP_PORT"); v != "" {
+			if _, err := fmt.Sscanf(v, "%d", &port); err != nil {
+				return errors.New("invalid ACCOUNT_SMTP_PORT")
+			}
+		}
+		m = mailer.New(mailer.Config{
+			Host: os.Getenv("ACCOUNT_SMTP_HOST"), Port: port,
+			Username: os.Getenv("ACCOUNT_SMTP_USERNAME"), Password: os.Getenv("ACCOUNT_SMTP_PASSWORD"),
+			From: os.Getenv("ACCOUNT_SMTP_FROM"), NoTLSForLocalhost: cfg.Environment == "development",
+		})
+	}
 	internalKey := os.Getenv("ACCOUNT_INTERNAL_KEY")
 	if len(internalKey) < 32 {
 		return errors.New("ACCOUNT_INTERNAL_KEY must be set (>=32 bytes); internal RPCs fail closed")
 	}
 	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(internalKey)))
-	apiSrv := grpcapi.New(ident, lnks, evSvc)
+	apiSrv := grpcapi.New(ident, lnks, evSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL")})
 	accountv1.RegisterIdentityServer(grpcSrv, apiSrv)
 	accountv1.RegisterLinksServer(grpcSrv, apiSrv)
 	accountv1.RegisterEventsServer(grpcSrv, apiSrv)

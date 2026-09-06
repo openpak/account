@@ -16,6 +16,7 @@ import (
 	"openpak/account/internal/events"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/links"
+	"openpak/account/internal/mailer"
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
 
@@ -26,10 +27,20 @@ type Server struct {
 	identity *identity.Service
 	links    *links.Service
 	events   *events.Service
+	mailer   *mailer.Mailer
+	baseURL  string
 }
 
-func New(ident *identity.Service, lnks *links.Service, evs *events.Service) *Server {
-	return &Server{identity: ident, links: lnks, events: evs}
+type Options struct {
+	Mailer  *mailer.Mailer // nil = development mode (tokens returned to callers)
+	BaseURL string         // public web base URL for email links
+}
+
+func New(ident *identity.Service, lnks *links.Service, evs *events.Service, opts Options) *Server {
+	if opts.BaseURL == "" {
+		opts.BaseURL = "http://localhost:8000"
+	}
+	return &Server{identity: ident, links: lnks, events: evs, mailer: opts.Mailer, baseURL: opts.BaseURL}
 }
 
 func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsRequest) (*accountv1.PollEventsResponse, error) {
