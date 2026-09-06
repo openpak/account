@@ -308,12 +308,22 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 }
 
 func (s *Service) issueToken(ctx context.Context, accountID, purpose string) (string, error) {
+	return s.issueTokenOpts(ctx, accountID, purpose, false)
+}
+
+// issueTokenResend issues an email_verify token flagged as a resend for
+// throttle purposes.
+func (s *Service) issueTokenResend(ctx context.Context, accountID string) (string, error) {
+	return s.issueTokenOpts(ctx, accountID, "email_verify", true)
+}
+
+func (s *Service) issueTokenOpts(ctx context.Context, accountID, purpose string, viaResend bool) (string, error) {
 	token, err := randomToken()
 	if err != nil {
 		return "", err
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO lifecycle_tokens (id, account_id, purpose, token_hash, expires_at)
-		VALUES ($1,$2,$3,$4,$5)`, newUUID(), accountID, purpose, hashToken(token, s.pepper), time.Now().Add(tokenTTL))
+	_, err = s.pool.Exec(ctx, `INSERT INTO lifecycle_tokens (id, account_id, purpose, token_hash, expires_at, via_resend)
+		VALUES ($1,$2,$3,$4,$5,$6)`, newUUID(), accountID, purpose, hashToken(token, s.pepper), time.Now().Add(tokenTTL), viaResend)
 	if err != nil {
 		return "", fmt.Errorf("identity: issue token: %w", err)
 	}
@@ -486,4 +496,48 @@ func (s *Service) RevokeByToken(ctx context.Context, token string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// ResendVerificationIfUnverified re-issues the email verification token for
+// an existing, unverified account (repair path for failed deliveries; PRD
+// FR-1). The supplied password must match: without this, the register
+// endpoint would be a mail-oracle to any address. Returns "" when there is
+// nothing to send, credentials fail, or the resend throttle (one per 10
+// minutes) trips. Enumeration-safe: callers must not differentiate.
+func (s *Service) ResendVerificationIfUnverified(ctx context.Context, email, password string) string {
+	normalized := normalizeEmail(email)
+	var accountID, passwordHash string
+	var verifiedAt *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, email_verified_at FROM accounts
+		WHERE email_normalized=$1 AND status='active'`, normalized).
+		Scan(&accountID, &passwordHash, &verifiedAt)
+	if err != nil || verifiedAt != nil {
+		return "" // unknown, deleted, banned, or already verified
+	}
+	if !comparePassword(passwordHash, s.pepper, password) {
+		return "" // credential proof required to trigger email delivery
+	}
+	// Throttle: at most one resend per 10 minutes even with valid creds.
+	// Only resend-issued tokens count — the initial signup token must not
+	// block the first repair (the failed-delivery case).
+	var recent bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM lifecycle_tokens
+		WHERE account_id=$1 AND purpose='email_verify' AND via_resend AND used_at IS NULL
+		AND created_at > now() - interval '10 minutes')`,
+		accountID).Scan(&recent); err != nil {
+		return ""
+	}
+	if recent {
+		return ""
+	}
+	// Invalidate older verify tokens so exactly one link works.
+	if _, err := s.pool.Exec(ctx, `UPDATE lifecycle_tokens SET used_at=now()
+		WHERE account_id=$1 AND purpose='email_verify' AND used_at IS NULL`, accountID); err != nil {
+		return ""
+	}
+	token, err := s.issueTokenResend(ctx, accountID)
+	if err != nil {
+		return ""
+	}
+	return token
 }

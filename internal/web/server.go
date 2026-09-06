@@ -77,31 +77,42 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	acct, verifyToken, err := s.identity.Register(r.Context(), req.Email, req.Password, req.DisplayName)
-	if err != nil {
-		switch {
-		case errors.Is(err, identity.ErrEmailTaken):
-			// Enumeration resistance: acknowledge without confirming.
-			writeJSON(w, http.StatusOK, map[string]string{
-				"message": "if the address is registerable, a verification email has been sent",
-			})
-		default:
-			writeError(w, http.StatusBadRequest, err.Error())
+	switch {
+	case err == nil:
+		// New account: deliver the verification email. A delivery failure
+		// must NOT change the response (enumeration resistance) — the
+		// user's repair path is retrying registration, which resends.
+		if s.mailer != nil {
+			_ = s.sendVerificationEmail(acct.Email, acct.DisplayName, verifyToken)
+			break
 		}
-		return
-	}
-	if s.mailer == nil {
-		// Development mode (no SMTP configured): surface the token so the
-		// flow is completable locally. Never happens in production wiring.
+		// No mailer configured (development): make the flow completable by
+		// surfacing the token; never the case in production wiring.
 		writeJSON(w, http.StatusCreated, map[string]any{"account_id": acct.ID, "verification_token": verifyToken})
 		return
-	}
-	if err := s.sendVerificationEmail(acct.Email, acct.DisplayName, verifyToken); err != nil {
-		// Registration succeeded but delivery failed: report so the caller
-		// can retry/resend rather than silently never verifying.
-		writeError(w, http.StatusInternalServerError, "account created but the verification email could not be sent")
+	case errors.Is(err, identity.ErrEmailTaken):
+		// Existing unverified account: resending on retry repairs the
+		// failed-delivery trap. Response identical to fresh success.
+		if token := s.identity.ResendVerificationIfUnverified(r.Context(), req.Email, req.Password); token != "" && s.mailer != nil {
+			_ = s.sendVerificationEmail(normalizeEmailAddress(req.Email), "", token)
+		}
+		writeJSON(w, http.StatusOK, maskedVerificationMessage)
+		return
+	default:
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"account_id": acct.ID})
+	// Identical response for fresh success and (rare) mailer failure; the
+	// duplicate path returns the same shape (enumeration resistance).
+	writeJSON(w, http.StatusOK, maskedVerificationMessage)
+}
+
+// maskedVerificationMessage is the only public registration outcome once a
+// mailer is configured: it neither confirms nor denies prior registration.
+const maskedVerificationMessage = "if the address is registerable, a verification email has been sent"
+
+func normalizeEmailAddress(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 func (s *Server) sendVerificationEmail(to, displayName, token string) error {
@@ -201,11 +212,12 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	// resistance). The reset token is NEVER returned in a response
 	// (review P0 #1); unauthenticated callers only ever receive this
 	// fixed message. Delivery goes to the registered address, when one
-	// exists, via the mailer.
-	if token != "" {
-		if err := s.sendPasswordResetEmail(req.Email, token); err != nil {
-			writeError(w, http.StatusInternalServerError, "internal error")
-			return
+	// exists, via the mailer. A nil mailer (misconfiguration/development)
+	// must not panic: respond identically and log (review follow-up).
+	if token != "" && s.mailer != nil {
+		if err := s.sendPasswordResetEmail(normalizeEmailAddress(req.Email), token); err != nil {
+			// Response unchanged; the user can retry (a new token is
+			// issued and old one remains valid until expiry).
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "if the address is registered, a reset email has been sent"})

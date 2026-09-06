@@ -2,6 +2,7 @@ package grpcapi
 
 import (
 	"context"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,6 +24,13 @@ func (s *Server) RegisterAccount(ctx context.Context, req *accountv1.RegisterAcc
 	acct, token, err := s.identity.Register(ctx, req.GetEmail(), req.GetPassword(), req.GetDisplayName())
 	if err != nil {
 		if err == identity.ErrEmailTaken {
+			// Existing unverified account: resend the verification email so
+			// a failed delivery is repairable by retrying registration.
+			if token := s.identity.ResendVerificationIfUnverified(ctx, req.GetEmail(), req.GetPassword()); token != "" && s.mailer != nil {
+				_ = s.mailer.Send(strings.ToLower(strings.TrimSpace(req.GetEmail())),
+					"Confirm your OpenPak email",
+					"Confirm your email address: "+s.baseURL+"/v1/verify?token="+token)
+			}
 			// Do not confirm or deny registration to the console user; the
 			// adapter surfaces its protocol-appropriate generic error.
 			return &accountv1.RegisterAccountResponse{EmailTaken: true}, nil

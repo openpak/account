@@ -86,9 +86,10 @@ func TestReviewWebTokenLeakAndDelivery(t *testing.T) {
 	srv, mailer := newWebServer(t, ident, &recordingMailer{})
 
 	// Register through the public API: email must be sent, token must NOT
-	// appear in the response (P0 #1 / P1 #6).
+	// appear in the response (P0 #1 / P1 #6). Success and duplicate paths
+	// share one masked response shape (enumeration resistance).
 	rec := postJSON(t, srv, "/v1/register", `{"email":"leak@example.com","password":"correct horse battery","display_name":"L"}`)
-	if rec.Code != 201 {
+	if rec.Code != 200 {
 		t.Fatalf("register: %d %s", rec.Code, rec.Body.String())
 	}
 	if strings.Contains(rec.Body.String(), "verification_token") {
