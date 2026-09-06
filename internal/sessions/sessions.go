@@ -1,0 +1,155 @@
+// Package sessions implements the live-adapter-session registry (PRD SW-07):
+// short core-owned leases give stale-session cleanup a shared clock. One
+// live session per (account, title): a new registration replaces the old.
+package sessions
+
+import (
+	"context"
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+var (
+	ErrInvalid        = errors.New("sessions: invalid request")
+	ErrAccountUnknown = errors.New("sessions: account unknown or inactive")
+	ErrNotFound       = errors.New("sessions: session not found or expired")
+)
+
+const (
+	DefaultLease = 30 * time.Second
+	MaxLease     = 5 * time.Minute
+)
+
+type Session struct {
+	ID          string
+	AccountID   string
+	Namespace   string
+	TitleID     string
+	EndpointRef string
+}
+
+type Service struct{ pool *pgxpool.Pool }
+
+func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+
+// Register inserts a live session, replacing any previous session for the
+// same (account, title). Returns the server-assigned session ID and the
+// applied lease.
+func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, endpointRef string, lease time.Duration) (string, time.Duration, error) {
+	if accountID == "" || namespace == "" || titleID == "" || endpointRef == "" {
+		return "", 0, ErrInvalid
+	}
+	if lease <= 0 {
+		lease = DefaultLease
+	}
+	if lease > MaxLease {
+		lease = MaxLease
+	}
+	var active bool
+	if err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM accounts WHERE id=$1 AND status='active')`,
+		accountID).Scan(&active); err != nil {
+		return "", 0, err
+	}
+	if !active {
+		return "", 0, ErrAccountUnknown
+	}
+	id := newUUID()
+	err := s.pool.QueryRow(ctx, `WITH replaced AS (
+			DELETE FROM adapter_sessions
+			WHERE account_id=$2 AND title_id=$3 AND expires_at <= now() RETURNING 1)
+		INSERT INTO adapter_sessions (session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
+		VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))
+		RETURNING extract(epoch FROM expires_at-now())::int`,
+		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds())).Scan(new(int))
+	if err != nil {
+		// Expired-row cleanup race is harmless; plain insert covers it.
+		tag, insertErr := s.pool.Exec(ctx, `INSERT INTO adapter_sessions
+			(session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
+			VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))`,
+			id, accountID, namespace, titleID, endpointRef, int(lease.Seconds()))
+		if insertErr != nil {
+			return "", 0, fmt.Errorf("sessions: register: %w", insertErr)
+		}
+		_ = tag
+	}
+	return id, lease, nil
+}
+
+// Heartbeat renews the lease. Expired or unknown sessions are not revived.
+func (s *Service) Heartbeat(ctx context.Context, sessionID string, lease time.Duration) (time.Duration, error) {
+	if sessionID == "" {
+		return 0, ErrInvalid
+	}
+	if lease <= 0 {
+		lease = DefaultLease
+	}
+	if lease > MaxLease {
+		lease = MaxLease
+	}
+	tag, err := s.pool.Exec(ctx, `UPDATE adapter_sessions
+		SET expires_at = now() + make_interval(secs => $2), updated_at = now()
+		WHERE session_id=$1 AND expires_at > now()`, sessionID, int(lease.Seconds()))
+	if err != nil {
+		return 0, err
+	}
+	if tag.RowsAffected() == 1 {
+		return lease, nil
+	}
+	return 0, ErrNotFound
+}
+
+// Expire removes a session (explicit teardown). Idempotent.
+func (s *Service) Expire(ctx context.Context, sessionID string) error {
+	if sessionID == "" {
+		return ErrInvalid
+	}
+	_, err := s.pool.Exec(ctx, `DELETE FROM adapter_sessions WHERE session_id=$1`, sessionID)
+	return err
+}
+
+// Resolve returns the live session for (account, title), if any. Expired
+// rows for the pair are reaped on read.
+func (s *Service) Resolve(ctx context.Context, accountID, titleID string) (*Session, error) {
+	if accountID == "" || titleID == "" {
+		return nil, ErrInvalid
+	}
+	sess := &Session{}
+	err := s.pool.QueryRow(ctx, `SELECT session_id, account_id, namespace, title_id, endpoint_ref
+		FROM adapter_sessions WHERE account_id=$1 AND title_id=$2 AND expires_at > now()`,
+		accountID, titleID).Scan(&sess.ID, &sess.AccountID, &sess.Namespace, &sess.TitleID, &sess.EndpointRef)
+	if errors.Is(err, pgx.ErrNoRows) {
+		_, _ = s.pool.Exec(ctx, `DELETE FROM adapter_sessions
+			WHERE account_id=$1 AND title_id=$2 AND expires_at <= now()`, accountID, titleID)
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return sess, nil
+}
+
+func newUUID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	const hexDigits = "0123456789abcdef"
+	out := make([]byte, 36)
+	pos := map[int]bool{8: true, 13: true, 18: true, 23: true}
+	j := 0
+	for i := 0; i < 36; i++ {
+		if pos[i] {
+			out[i] = '-'
+			continue
+		}
+		out[i] = hexDigits[b[j>>1]>>(4-(j&1)*4)&0x0f]
+		j++
+	}
+	return string(out)
+}
