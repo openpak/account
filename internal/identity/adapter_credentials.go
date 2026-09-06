@@ -17,7 +17,7 @@ func (s *Service) SetAdapterCredential(ctx context.Context, namespace, accountID
 	if namespace == "" || accountID == "" || secret == "" {
 		return errors.New("identity: namespace, account, and secret are required")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(pepperSuffix(s.pepper)+secret), bcryptCost)
+	hash, err := hashPassword(s.pepper, secret)
 	if err != nil {
 		return err
 	}
@@ -39,7 +39,7 @@ func (s *Service) VerifyAdapterCredential(ctx context.Context, namespace, accoun
 		WHERE c.namespace=$1 AND c.account_id=$2`, strings.ToLower(namespace), accountID).
 		Scan(&hash, &status, &verifiedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(pepperSuffix(s.pepper)+secret))
+		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, secret)))
 		return nil, ErrBadCredentials
 	}
 	if err != nil {
@@ -48,7 +48,7 @@ func (s *Service) VerifyAdapterCredential(ctx context.Context, namespace, accoun
 	if err := mapStatusErr(status); err != nil {
 		return nil, err
 	}
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(pepperSuffix(s.pepper)+secret)) != nil {
+	if !comparePassword(hash, s.pepper, secret) {
 		return nil, ErrBadCredentials
 	}
 	return &Account{ID: accountID, Status: status, EmailVerified: verifiedAt != nil}, nil

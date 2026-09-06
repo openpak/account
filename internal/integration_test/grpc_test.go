@@ -32,7 +32,7 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, *
 		t.Fatalf("connect: %v", err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(ctx, `DROP TABLE IF EXISTS sessions, lifecycle_tokens, adapter_links, accounts, schema_migrations, invalidation_events CASCADE; DROP SEQUENCE IF EXISTS invalidation_events_version_seq CASCADE`); err != nil {
+	if _, err := pool.Exec(ctx, `DROP TABLE IF EXISTS sessions, lifecycle_tokens, adapter_links, accounts, adapter_credentials, schema_migrations, invalidation_events CASCADE; DROP SEQUENCE IF EXISTS invalidation_events_version_seq CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if err := storage.Migrate(ctx, pool); err != nil {

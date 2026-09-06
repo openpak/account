@@ -117,7 +117,7 @@ func (s *Service) Register(ctx context.Context, email, password, displayName str
 	if err := validateRegistration(email, password, displayName); err != nil {
 		return nil, "", err
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password+pepperSuffix(s.pepper)), bcryptCost)
+	hash, err := hashPassword(s.pepper, password)
 	if err != nil {
 		return nil, "", err
 	}
@@ -175,7 +175,7 @@ func (s *Service) VerifyCredentials(ctx context.Context, email, password string)
 		Scan(&id, &hash, &status, &verifiedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Equalize timing by performing a dummy bcrypt comparison.
-		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(password+pepperSuffix(s.pepper)))
+		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, password)))
 		return nil, ErrBadCredentials
 	}
 	if err != nil {
@@ -184,7 +184,7 @@ func (s *Service) VerifyCredentials(ctx context.Context, email, password string)
 	if err := mapStatusErr(status); err != nil {
 		return nil, err
 	}
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password+pepperSuffix(s.pepper))) != nil {
+	if !comparePassword(hash, s.pepper, password) {
 		return nil, ErrBadCredentials
 	}
 	return &Account{ID: id, Status: status, EmailVerified: verifiedAt != nil}, nil
@@ -283,7 +283,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	if len(newPassword) < 8 || len(newPassword) > maxPasswordLen {
 		return errors.New("identity: password must be 8-128 characters")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword+pepperSuffix(s.pepper)), bcryptCost)
+	hash, err := hashPassword(s.pepper, newPassword)
 	if err != nil {
 		return err
 	}
@@ -368,6 +368,23 @@ func mapStatusErr(s Status) error {
 
 func pepperSuffix(pepper string) string { return "\x00" + pepper }
 
+// bcryptInput pre-hashes the peppered secret with SHA-256 so bcrypt's 72-byte
+// input limit is never exceeded regardless of user password length. The same
+// derivation is used on every hash and verify path.
+func bcryptInput(pepper, secret string) string {
+	h := sha256.Sum256([]byte(pepper + "\x00" + secret))
+	return hex.EncodeToString(h[:])
+}
+
+func hashPassword(pepper, secret string) (string, error) {
+	b, err := bcrypt.GenerateFromPassword([]byte(bcryptInput(pepper, secret)), bcryptCost)
+	return string(b), err
+}
+
+func comparePassword(hash, pepper, secret string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(bcryptInput(pepper, secret))) == nil
+}
+
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "SQLSTATE 23505")
 }
@@ -388,7 +405,7 @@ func (s *Service) VerifyByID(ctx context.Context, accountID, password string) (*
 		FROM accounts WHERE id = $1`, accountID).
 		Scan(&id, &hash, &status, &verifiedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(password+pepperSuffix(s.pepper)))
+		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, password)))
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -397,7 +414,7 @@ func (s *Service) VerifyByID(ctx context.Context, accountID, password string) (*
 	if err := mapStatusErr(status); err != nil {
 		return nil, err
 	}
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password+pepperSuffix(s.pepper))) != nil {
+	if !comparePassword(hash, s.pepper, password) {
 		return nil, ErrBadCredentials
 	}
 	return &Account{ID: id, Status: status, EmailVerified: verifiedAt != nil}, nil
