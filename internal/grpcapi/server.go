@@ -127,6 +127,10 @@ func (s *Server) VerifyPassword(ctx context.Context, req *accountv1.VerifyPasswo
 		AccountId:     acct.ID,
 		Status:        accountv1.AccountStatus_ACCOUNT_STATUS_ACTIVE,
 		EmailVerified: acct.EmailVerified,
+		// The Switch adapter builds a user object from these; the console rejects it outright
+		// when either is missing.
+		Country:  acct.Country,
+		Birthday: acct.Birthday,
 	}, nil
 }
 

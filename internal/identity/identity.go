@@ -52,6 +52,10 @@ type Account struct {
 	Status        Status
 	EmailVerified bool
 	CreatedAt     time.Time
+	// Collected at registration; the Switch adapter needs both to build a user object the
+	// console will accept.
+	Country  string
+	Birthday string
 }
 
 // Emitter records durable invalidation events inside the caller's
@@ -114,8 +118,22 @@ func validateRegistration(email, password, displayName string) error {
 
 // Register creates an account and returns the email-verification token (the
 // caller delivers it; the service never emails directly).
+// Profile is what registration collects beyond credentials. Both fields are required by the
+// Switch's user object, which is rejected outright when either is missing.
+type Profile struct {
+	Country  string // ISO 3166-1 alpha-2, e.g. "GB"
+	Birthday string // ISO 8601 date, e.g. "1990-01-01"
+}
+
 func (s *Service) Register(ctx context.Context, email, password, displayName string) (*Account, string, error) {
+	return s.RegisterWithProfile(ctx, email, password, displayName, Profile{})
+}
+
+func (s *Service) RegisterWithProfile(ctx context.Context, email, password, displayName string, p Profile) (*Account, string, error) {
 	if err := validateRegistration(email, password, displayName); err != nil {
+		return nil, "", err
+	}
+	if err := validateProfile(&p); err != nil {
 		return nil, "", err
 	}
 	hash, err := hashPassword(s.pepper, password)
@@ -124,8 +142,13 @@ func (s *Service) Register(ctx context.Context, email, password, displayName str
 	}
 	id := newUUID()
 	normalized := normalizeEmail(email)
-	_, err = s.pool.Exec(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name)
-		VALUES ($1,$2,$3,$4,$5)`, id, strings.TrimSpace(email), normalized, string(hash), strings.TrimSpace(displayName))
+	var birthday any
+	if p.Birthday != "" {
+		birthday = p.Birthday
+	}
+	_, err = s.pool.Exec(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name, country, birthday)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`, id, strings.TrimSpace(email), normalized, string(hash),
+		strings.TrimSpace(displayName), p.Country, birthday)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, "", ErrEmailTaken
@@ -137,7 +160,7 @@ func (s *Service) Register(ctx context.Context, email, password, displayName str
 		return nil, "", err
 	}
 	return &Account{ID: id, Email: strings.TrimSpace(email), DisplayName: strings.TrimSpace(displayName),
-		Status: StatusActive}, token, nil
+		Country: p.Country, Birthday: p.Birthday, Status: StatusActive}, token, nil
 }
 
 // VerifyEmail consumes a single-use verification token.
@@ -168,12 +191,13 @@ func (s *Service) Login(ctx context.Context, email, password string) (sessionTok
 // no session, token, or hash ever crosses the boundary.
 func (s *Service) VerifyCredentials(ctx context.Context, email, password string) (*Account, error) {
 	normalized := normalizeEmail(email)
-	var id, hash string
+	var id, hash, country string
 	var status Status
 	var verifiedAt *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at
+	var birthday *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at, country, birthday
 		FROM accounts WHERE email_normalized = $1`, normalized).
-		Scan(&id, &hash, &status, &verifiedAt)
+		Scan(&id, &hash, &status, &verifiedAt, &country, &birthday)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Equalize timing by performing a dummy bcrypt comparison.
 		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, password)))
@@ -188,7 +212,12 @@ func (s *Service) VerifyCredentials(ctx context.Context, email, password string)
 	if !comparePassword(hash, s.pepper, password) {
 		return nil, ErrBadCredentials
 	}
-	return &Account{ID: id, Status: status, EmailVerified: verifiedAt != nil}, nil
+	bday := ""
+	if birthday != nil {
+		bday = birthday.Format("2006-01-02")
+	}
+	return &Account{ID: id, Status: status, EmailVerified: verifiedAt != nil,
+		Country: country, Birthday: bday}, nil
 }
 
 // GetByID returns minimal account status/profile projection for internal
@@ -449,9 +478,11 @@ func (s *Service) VerifyByID(ctx context.Context, accountID, password string) (*
 	var id, hash string
 	var status Status
 	var verifiedAt *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at
+	var country string
+	var birthday *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at, country, birthday
 		FROM accounts WHERE id = $1`, accountID).
-		Scan(&id, &hash, &status, &verifiedAt)
+		Scan(&id, &hash, &status, &verifiedAt, &country, &birthday)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, password)))
 		return nil, ErrNotFound
@@ -577,4 +608,20 @@ func (s *Service) ResendVerificationIfUnverified(ctx context.Context, email, pas
 		return ""
 	}
 	return token
+}
+
+// validateProfile keeps obviously wrong values out of the database; both fields are optional
+// here so an adapter that never collected them can still register an account.
+func validateProfile(p *Profile) error {
+	p.Country = strings.ToUpper(strings.TrimSpace(p.Country))
+	p.Birthday = strings.TrimSpace(p.Birthday)
+	if p.Country != "" && len(p.Country) != 2 {
+		return errors.New("identity: country must be a two-letter code")
+	}
+	if p.Birthday != "" {
+		if _, err := time.Parse("2006-01-02", p.Birthday); err != nil {
+			return errors.New("identity: birthday must be YYYY-MM-DD")
+		}
+	}
+	return nil
 }

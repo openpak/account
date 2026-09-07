@@ -22,7 +22,8 @@ func (s *Server) RegisterAccount(ctx context.Context, req *accountv1.RegisterAcc
 	if req.GetCallerNamespace() == "" || req.GetPurpose() == "" {
 		return nil, status.Error(codes.InvalidArgument, "caller_namespace and purpose are required")
 	}
-	acct, token, err := s.identity.Register(ctx, req.GetEmail(), req.GetPassword(), req.GetDisplayName())
+	acct, token, err := s.identity.RegisterWithProfile(ctx, req.GetEmail(), req.GetPassword(), req.GetDisplayName(),
+		identity.Profile{Country: req.GetCountry()})
 	if err != nil {
 		if err == identity.ErrEmailTaken {
 			// Existing unverified account: resend the verification email so

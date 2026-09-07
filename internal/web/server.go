@@ -85,11 +85,16 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Email       string `json:"email"`
 		Password    string `json:"password"`
 		DisplayName string `json:"display_name"`
+		// Required by the Switch's user object; collected at registration so no adapter has to
+		// invent them later.
+		Country  string `json:"country"`
+		Birthday string `json:"birthday"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	acct, verifyToken, err := s.identity.Register(r.Context(), req.Email, req.Password, req.DisplayName)
+	acct, verifyToken, err := s.identity.RegisterWithProfile(r.Context(), req.Email, req.Password, req.DisplayName,
+		identity.Profile{Country: req.Country, Birthday: req.Birthday})
 	switch {
 	case err == nil:
 		// New account: deliver the verification email. A delivery failure
