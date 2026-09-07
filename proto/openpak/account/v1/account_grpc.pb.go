@@ -339,10 +339,11 @@ var Identity_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Links_ReserveLink_FullMethodName      = "/openpak.account.v1.Links/ReserveLink"
-	Links_ActivateLink_FullMethodName     = "/openpak.account.v1.Links/ActivateLink"
-	Links_UnlinkLink_FullMethodName       = "/openpak.account.v1.Links/UnlinkLink"
-	Links_GetLinkBySubject_FullMethodName = "/openpak.account.v1.Links/GetLinkBySubject"
+	Links_ReserveLink_FullMethodName            = "/openpak.account.v1.Links/ReserveLink"
+	Links_ActivateLink_FullMethodName           = "/openpak.account.v1.Links/ActivateLink"
+	Links_UnlinkLink_FullMethodName             = "/openpak.account.v1.Links/UnlinkLink"
+	Links_GetLinkBySubject_FullMethodName       = "/openpak.account.v1.Links/GetLinkBySubject"
+	Links_GetActiveLinkByAccount_FullMethodName = "/openpak.account.v1.Links/GetActiveLinkByAccount"
 )
 
 // LinksClient is the client API for Links service.
@@ -362,6 +363,10 @@ type LinksClient interface {
 	UnlinkLink(ctx context.Context, in *UnlinkLinkRequest, opts ...grpc.CallOption) (*UnlinkLinkResponse, error)
 	// Look up the active link for an adapter subject.
 	GetLinkBySubject(ctx context.Context, in *GetLinkBySubjectRequest, opts ...grpc.CallOption) (*GetLinkBySubjectResponse, error)
+	// Resolve the active link for an account in one adapter namespace, so
+	// adapter retries never mint a second subject (PRD SW-01). NotFound when
+	// the account has no active link in that namespace.
+	GetActiveLinkByAccount(ctx context.Context, in *GetActiveLinkByAccountRequest, opts ...grpc.CallOption) (*GetLinkBySubjectResponse, error)
 }
 
 type linksClient struct {
@@ -412,6 +417,16 @@ func (c *linksClient) GetLinkBySubject(ctx context.Context, in *GetLinkBySubject
 	return out, nil
 }
 
+func (c *linksClient) GetActiveLinkByAccount(ctx context.Context, in *GetActiveLinkByAccountRequest, opts ...grpc.CallOption) (*GetLinkBySubjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetLinkBySubjectResponse)
+	err := c.cc.Invoke(ctx, Links_GetActiveLinkByAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LinksServer is the server API for Links service.
 // All implementations must embed UnimplementedLinksServer
 // for forward compatibility.
@@ -429,6 +444,10 @@ type LinksServer interface {
 	UnlinkLink(context.Context, *UnlinkLinkRequest) (*UnlinkLinkResponse, error)
 	// Look up the active link for an adapter subject.
 	GetLinkBySubject(context.Context, *GetLinkBySubjectRequest) (*GetLinkBySubjectResponse, error)
+	// Resolve the active link for an account in one adapter namespace, so
+	// adapter retries never mint a second subject (PRD SW-01). NotFound when
+	// the account has no active link in that namespace.
+	GetActiveLinkByAccount(context.Context, *GetActiveLinkByAccountRequest) (*GetLinkBySubjectResponse, error)
 	mustEmbedUnimplementedLinksServer()
 }
 
@@ -450,6 +469,9 @@ func (UnimplementedLinksServer) UnlinkLink(context.Context, *UnlinkLinkRequest) 
 }
 func (UnimplementedLinksServer) GetLinkBySubject(context.Context, *GetLinkBySubjectRequest) (*GetLinkBySubjectResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLinkBySubject not implemented")
+}
+func (UnimplementedLinksServer) GetActiveLinkByAccount(context.Context, *GetActiveLinkByAccountRequest) (*GetLinkBySubjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetActiveLinkByAccount not implemented")
 }
 func (UnimplementedLinksServer) mustEmbedUnimplementedLinksServer() {}
 func (UnimplementedLinksServer) testEmbeddedByValue()               {}
@@ -544,6 +566,24 @@ func _Links_GetLinkBySubject_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Links_GetActiveLinkByAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetActiveLinkByAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LinksServer).GetActiveLinkByAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Links_GetActiveLinkByAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LinksServer).GetActiveLinkByAccount(ctx, req.(*GetActiveLinkByAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Links_ServiceDesc is the grpc.ServiceDesc for Links service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -566,6 +606,10 @@ var Links_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLinkBySubject",
 			Handler:    _Links_GetLinkBySubject_Handler,
+		},
+		{
+			MethodName: "GetActiveLinkByAccount",
+			Handler:    _Links_GetActiveLinkByAccount_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

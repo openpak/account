@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
 	"openpak/account/internal/events"
@@ -138,5 +140,39 @@ func TestGRPCLinkContract(t *testing.T) {
 	// Unlink contract.
 	if _, err := lc.UnlinkLink(ctx, &accountv1.UnlinkLinkRequest{LinkId: res.LinkId, IdempotencyKey: "k3"}); err != nil {
 		t.Fatalf("unlink: %v", err)
+	}
+}
+
+func TestGRPCGetActiveLinkByAccount(t *testing.T) {
+	_, lc, _, _, _, ident := startGRPC(t)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", grpcInternalKey)
+
+	acct, _, err := ident.Register(ctx, "active-link@example.com", "correct horse battery", "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// No active link yet.
+	if _, err := lc.GetActiveLinkByAccount(ctx, &accountv1.GetActiveLinkByAccountRequest{
+		Namespace: "switch", AccountId: acct.ID}); status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound before linking, got %v", err)
+	}
+	res, err := lc.ReserveLink(ctx, &accountv1.ReserveLinkRequest{
+		AccountId: acct.ID, Namespace: "switch", SubjectId: "sw1:01929e60-3e21-4d78-8219-da68c17e6838",
+		IdempotencyKey: "k1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lc.ActivateLink(ctx, &accountv1.ActivateLinkRequest{LinkId: res.LinkId, IdempotencyKey: "k2"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := lc.GetActiveLinkByAccount(ctx, &accountv1.GetActiveLinkByAccountRequest{
+		Namespace: "switch", AccountId: acct.ID})
+	if err != nil || got.GetSubjectId() != "sw1:01929e60-3e21-4d78-8219-da68c17e6838" || got.GetState() != accountv1.LinkState_LINK_STATE_ACTIVE {
+		t.Fatalf("active lookup: %+v %v", got, err)
+	}
+	// Other namespaces see nothing.
+	if _, err := lc.GetActiveLinkByAccount(ctx, &accountv1.GetActiveLinkByAccountRequest{
+		Namespace: "wiiu", AccountId: acct.ID}); status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound in other namespace, got %v", err)
 	}
 }

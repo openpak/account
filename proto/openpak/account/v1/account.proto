@@ -106,6 +106,10 @@ service Links {
   rpc UnlinkLink(UnlinkLinkRequest) returns (UnlinkLinkResponse);
   // Look up the active link for an adapter subject.
   rpc GetLinkBySubject(GetLinkBySubjectRequest) returns (GetLinkBySubjectResponse);
+  // Resolve the active link for an account in one adapter namespace, so
+  // adapter retries never mint a second subject (PRD SW-01). NotFound when
+  // the account has no active link in that namespace.
+  rpc GetActiveLinkByAccount(GetActiveLinkByAccountRequest) returns (GetLinkBySubjectResponse);
 }
 
 message ReserveLinkRequest {
@@ -139,10 +143,18 @@ message GetLinkBySubjectRequest {
   string subject_id = 2;
 }
 
+message GetActiveLinkByAccountRequest {
+  string namespace = 1;
+  string account_id = 2;
+}
+
 message GetLinkBySubjectResponse {
   string link_id = 1;
   string account_id = 2;
   LinkState state = 3;
+  // Populated only by GetActiveLinkByAccount (the subject is the lookup key
+  // on GetLinkBySubject).
+  string subject_id = 4;
 }
 
 enum LinkState {

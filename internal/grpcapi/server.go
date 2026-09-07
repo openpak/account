@@ -220,6 +220,31 @@ func (s *Server) GetLinkBySubject(ctx context.Context, req *accountv1.GetLinkByS
 	return &accountv1.GetLinkBySubjectResponse{LinkId: l.ID, AccountId: l.AccountID, State: linkState(l.State)}, nil
 }
 
+// GetActiveLinkByAccount resolves the account's active link in one adapter
+// namespace (PRD SW-01): adapters call this before minting a subject so
+// retries never create duplicates.
+func (s *Server) GetActiveLinkByAccount(ctx context.Context, req *accountv1.GetActiveLinkByAccountRequest) (*accountv1.GetLinkBySubjectResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	if req.GetNamespace() == "" || req.GetAccountId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "namespace and account_id are required")
+	}
+	all, err := s.links.ListByAccount(ctx, req.GetAccountId())
+	if err != nil {
+		return nil, mapLinkErr(err)
+	}
+	for _, l := range all {
+		if l.Namespace == req.GetNamespace() && l.State == links.Active {
+			return &accountv1.GetLinkBySubjectResponse{
+				LinkId: l.ID, AccountId: l.AccountID, SubjectId: l.SubjectID,
+				State: linkState(l.State),
+			}, nil
+		}
+	}
+	return nil, status.Error(codes.NotFound, "no active link for account in namespace")
+}
+
 func mapLinkErr(err error) error {
 	switch {
 	case errors.Is(err, links.ErrConflict):
