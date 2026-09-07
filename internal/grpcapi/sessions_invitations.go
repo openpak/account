@@ -97,6 +97,18 @@ func (s *Server) PollInvitations(ctx context.Context, req *accountv1.PollInvitat
 	return resp, nil
 }
 
+func (s *Server) AckInvitations(ctx context.Context, req *accountv1.AckInvitationsRequest) (*accountv1.AckInvitationsResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	acked, err := s.invitations.Ack(ctx, req.GetNamespace(), req.GetAccountId(),
+		req.GetInvitationIds(), req.GetNonces())
+	if err != nil {
+		return nil, mapInvitationErr(err)
+	}
+	return &accountv1.AckInvitationsResponse{Acked: int32(acked)}, nil
+}
+
 func mapSessionErr(err error) error {
 	switch {
 	case errors.Is(err, sessions.ErrInvalid):

@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"openpak/account/internal/invitations"
+	"openpak/account/internal/sessions"
+	"openpak/account/internal/social"
+	"openpak/account/internal/storage"
 
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
@@ -198,6 +204,138 @@ func TestSessionRegistry(t *testing.T) {
 	}
 }
 
+func TestInvitationBlockedAfterQueue(t *testing.T) {
+	_, _, soc, sess, inv, ident := startGRPC(t)
+	ctx := authCtx()
+
+	a, _, err := ident.Register(ctx, "qb-a@example.com", "correct horse battery", "QA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := ident.Register(ctx, "qb-b@example.com", "correct horse battery", "QB")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const title = "0100E65002BB8000"
+	if _, err := soc.RequestFriend(ctx, &accountv1.RequestFriendRequest{RequesterId: a.ID, AddresseeId: b.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := soc.AcceptFriend(ctx, &accountv1.AcceptFriendRequest{AddresseeId: b.ID, RequesterId: a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sess.RegisterSession(ctx, &accountv1.RegisterSessionRequest{
+		AccountId: b.ID, Namespace: "switch", TitleId: title, EndpointRef: "ep"}); err != nil {
+		t.Fatal(err)
+	}
+	sent, err := inv.SendInvitation(ctx, &accountv1.SendInvitationRequest{
+		FromAccountId: a.ID, ToAccountId: b.ID, TitleId: title, Payload: []byte("join"), TtlSeconds: 300})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Recipient blocks the sender AFTER queueing: delivery must be refused.
+	if _, err := soc.Block(ctx, &accountv1.BlockRequest{BlockerId: b.ID, BlockedId: a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := inv.PollInvitations(ctx, &accountv1.PollInvitationsRequest{Namespace: "switch", AccountId: b.ID})
+	if err != nil || len(got.Invitations) != 0 {
+		t.Fatalf("queued invitation delivered despite block: %+v %v", got, err)
+	}
+	var state string
+	if err := ident.Pool().QueryRow(ctx,
+		`SELECT state FROM invitations WHERE id=$1`, sent.InvitationId).Scan(&state); err != nil || state != "rejected" {
+		t.Fatalf("expected rejected state, got %q %v", state, err)
+	}
+	// Ack cannot resurrect it.
+	if ack, err := inv.AckInvitations(ctx, &accountv1.AckInvitationsRequest{Namespace: "switch", AccountId: b.ID,
+		InvitationIds: []string{sent.InvitationId}, Nonces: []string{sent.Nonce}}); err != nil || ack.Acked != 0 {
+		t.Fatalf("ack after rejection: %+v %v", ack, err)
+	}
+	// Unblocking does not revive the rejected invitation.
+	if _, err := soc.Unblock(ctx, &accountv1.UnblockRequest{BlockerId: b.ID, BlockedId: a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = inv.PollInvitations(ctx, &accountv1.PollInvitationsRequest{Namespace: "switch", AccountId: b.ID})
+	if err != nil || len(got.Invitations) != 0 {
+		t.Fatalf("post-unblock poll: %+v %v", got, err)
+	}
+}
+
+func TestInvitationSessionLoss(t *testing.T) {
+	_, _, soc, sess, inv, ident := startGRPC(t)
+	ctx := authCtx()
+
+	a, _, err := ident.Register(ctx, "sl-a@example.com", "correct horse battery", "SA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := ident.Register(ctx, "sl-b@example.com", "correct horse battery", "SB")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const title = "0100E65002BB8000"
+	if _, err := soc.RequestFriend(ctx, &accountv1.RequestFriendRequest{RequesterId: a.ID, AddresseeId: b.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := soc.AcceptFriend(ctx, &accountv1.AcceptFriendRequest{AddresseeId: b.ID, RequesterId: a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sess.RegisterSession(ctx, &accountv1.RegisterSessionRequest{
+		AccountId: b.ID, Namespace: "switch", TitleId: title, EndpointRef: "ep", LeaseSeconds: 1}); err != nil {
+		t.Fatal(err)
+	}
+	sent, err := inv.SendInvitation(ctx, &accountv1.SendInvitationRequest{
+		FromAccountId: a.ID, ToAccountId: b.ID, TitleId: title, Payload: []byte("join"), TtlSeconds: 300})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Remove/expire the bound session: the queued invitation must not deliver.
+	time.Sleep(1200 * time.Millisecond)
+	got, err := inv.PollInvitations(ctx, &accountv1.PollInvitationsRequest{Namespace: "switch", AccountId: b.ID})
+	if err != nil || len(got.Invitations) != 0 {
+		t.Fatalf("delivered after session loss: %+v %v", got, err)
+	}
+	var state string
+	if err := ident.Pool().QueryRow(ctx,
+		`SELECT state FROM invitations WHERE id=$1`, sent.InvitationId).Scan(&state); err != nil || state != "expired" {
+		t.Fatalf("expected expired state, got %q %v", state, err)
+	}
+}
+
+func TestSessionRegistrationConcurrency(t *testing.T) {
+	_, _, _, sess, _, ident := startGRPC(t)
+	ctx := authCtx()
+
+	a, _, err := ident.Register(ctx, "conc-a@example.com", "correct horse battery", "C")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const title = "0100E65002BB8000"
+	const n = 8
+	errCh := make(chan error, n)
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			_, err := sess.RegisterSession(authCtx(), &accountv1.RegisterSessionRequest{
+				AccountId: a.ID, Namespace: "switch", TitleId: title,
+				EndpointRef: fmt.Sprintf("ep-%d", i)})
+			errCh <- err
+		}(i)
+	}
+	for i := 0; i < n; i++ {
+		if err := <-errCh; err != nil {
+			t.Fatalf("concurrent register: %v", err)
+		}
+	}
+	var count int
+	if err := ident.Pool().QueryRow(ctx,
+		`SELECT count(*) FROM adapter_sessions WHERE account_id=$1 AND title_id=$2`, a.ID, title).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("expected exactly 1 live session row, got %d %v", count, err)
+	}
+	if _, err := sess.ResolveSession(ctx, &accountv1.ResolveSessionRequest{AccountId: a.ID, TitleId: title}); err != nil {
+		t.Fatalf("resolve after concurrency: %v", err)
+	}
+}
+
 func TestInvitationFlow(t *testing.T) {
 	_, _, soc, sess, inv, ident := startGRPC(t)
 	ctx := authCtx()
@@ -265,10 +403,24 @@ func TestInvitationFlow(t *testing.T) {
 		gi.FromAccountId != a.ID || gi.FromDisplayName != "Host" {
 		t.Fatalf("invitation mismatch: %+v", gi)
 	}
-	// Delivered is terminal for polling.
+	// At-least-once: still pending inside the redelivery window; the second
+	// poll returns nothing until acknowledged.
 	got, err = inv.PollInvitations(ctx, &accountv1.PollInvitationsRequest{Namespace: "switch", AccountId: b.ID})
 	if err != nil || len(got.Invitations) != 0 {
-		t.Fatalf("replay poll: %+v %v", got, err)
+		t.Fatalf("poll inside redelivery window: %+v %v", got, err)
+	}
+	// Ack with the wrong nonce is rejected; the right nonce delivers.
+	if ack, err := inv.AckInvitations(ctx, &accountv1.AckInvitationsRequest{Namespace: "switch", AccountId: b.ID,
+		InvitationIds: []string{sent.InvitationId}, Nonces: []string{"00000000-0000-0000-0000-000000000000"}}); err != nil || ack.Acked != 0 {
+		t.Fatalf("wrong-nonce ack: %+v %v", ack, err)
+	}
+	if ack, err := inv.AckInvitations(ctx, &accountv1.AckInvitationsRequest{Namespace: "switch", AccountId: b.ID,
+		InvitationIds: []string{sent.InvitationId}, Nonces: []string{sent.Nonce}}); err != nil || ack.Acked != 1 {
+		t.Fatalf("ack: %+v %v", ack, err)
+	}
+	got, err = inv.PollInvitations(ctx, &accountv1.PollInvitationsRequest{Namespace: "switch", AccountId: b.ID})
+	if err != nil || len(got.Invitations) != 0 {
+		t.Fatalf("post-ack poll: %+v %v", got, err)
 	}
 
 	// Validation: oversized payload and bad TTL are InvalidArgument.
@@ -293,4 +445,60 @@ func TestInvitationFlow(t *testing.T) {
 		t.Fatalf("expected FailedPrecondition after lease expiry, got %v", err)
 	}
 
+}
+
+// TestInvitationPollSingleConnection pins the pool-exhaustion fix: Poll must
+// complete on a one-connection pool because all its policy checks run through
+// the transaction it already holds, never through a second checkout.
+func TestInvitationPollSingleConnection(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool, err := storage.Connect(ctx, testDBURL+"&pool_max_conns=1")
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	soc := social.New(pool)
+	sess := sessions.New(pool)
+	inv := invitations.New(pool, soc, singleConnResolver{sess})
+
+	var aID, bID string
+	if err := pool.QueryRow(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name)
+		VALUES (gen_random_uuid(),'sc1@x.test','sc1@x.test','h','S1') RETURNING id`).Scan(&aID); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name)
+		VALUES (gen_random_uuid(),'sc2@x.test','sc2@x.test','h','S2') RETURNING id`).Scan(&bID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := soc.RequestFriend(ctx, aID, bID, "k"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := soc.AcceptFriend(ctx, bID, aID, "k"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := sess.Register(ctx, bID, "switch", "t", "ep", 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := inv.Send(ctx, aID, bID, "t", []byte("hey"), time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	got, err := inv.Poll(ctx, "switch", bID, 10)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("single-connection poll: %d invitations, err=%v", len(got), err)
+	}
+	acked, err := inv.Ack(ctx, "switch", bID, []string{got[0].ID}, []string{got[0].Nonce})
+	if err != nil || acked != 1 {
+		t.Fatalf("single-connection ack: %d acked, err=%v", acked, err)
+	}
+}
+
+type singleConnResolver struct{ s *sessions.Service }
+
+func (r singleConnResolver) Resolve(ctx context.Context, accountID, titleID string) (*invitations.SessionRef, error) {
+	sess, err := r.s.Resolve(ctx, accountID, titleID)
+	if err != nil {
+		return nil, err
+	}
+	return &invitations.SessionRef{ID: sess.ID, Namespace: sess.Namespace}, nil
 }

@@ -60,14 +60,17 @@ func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, e
 		return "", 0, ErrAccountUnknown
 	}
 	id := newUUID()
-	// Replace semantics: one live session per (account, title).
-	if _, err := s.pool.Exec(ctx, `DELETE FROM adapter_sessions
-		WHERE account_id=$1 AND title_id=$2`, accountID, titleID); err != nil {
-		return "", 0, err
-	}
+	// Atomic replacement: the unique (account_id, title_id) key backs an
+	// upsert, so concurrent registrations converge on exactly one live row.
 	if _, err := s.pool.Exec(ctx, `INSERT INTO adapter_sessions
 		(session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
-		VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))`,
+		VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))
+		ON CONFLICT (account_id, title_id) DO UPDATE SET
+			session_id = EXCLUDED.session_id,
+			namespace = EXCLUDED.namespace,
+			endpoint_ref = EXCLUDED.endpoint_ref,
+			expires_at = EXCLUDED.expires_at,
+			updated_at = now()`,
 		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds())); err != nil {
 		return "", 0, fmt.Errorf("sessions: register: %w", err)
 	}

@@ -31,7 +31,10 @@ CREATE TABLE adapter_sessions (
     endpoint_ref TEXT NOT NULL,
     expires_at   TIMESTAMPTZ NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- database-enforced single live routing target per (account, title);
+    -- registration upserts atomically on this key.
+    UNIQUE (account_id, title_id)
 );
 
 CREATE INDEX idx_adapter_sessions_account ON adapter_sessions(account_id, title_id);
@@ -42,11 +45,13 @@ CREATE TABLE invitations (
     to_id        UUID NOT NULL REFERENCES accounts(id),
     namespace    TEXT NOT NULL,
     title_id     TEXT NOT NULL,
+    session_id   UUID NOT NULL,       -- live session bound at send time
     payload      BYTEA NOT NULL,
     nonce        UUID NOT NULL UNIQUE,
     expires_at   TIMESTAMPTZ NOT NULL,
     state        TEXT NOT NULL DEFAULT 'pending'
                  CHECK (state IN ('pending','delivered','expired','rejected')),
+    delivery_started_at TIMESTAMPTZ,  -- redelivery window marker (at-least-once)
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     delivered_at TIMESTAMPTZ
 );

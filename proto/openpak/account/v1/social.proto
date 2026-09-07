@@ -19,6 +19,8 @@ service Social {
   rpc ListFriends(ListFriendsRequest) returns (ListFriendsResponse);
   // Pending incoming requests for an account.
   rpc ListIncomingRequests(ListIncomingRequestsRequest) returns (ListIncomingRequestsResponse);
+  // Pending requests the account SENT (Wii U protocol needs both sides).
+  rpc ListOutgoingRequests(ListOutgoingRequestsRequest) returns (ListOutgoingRequestsResponse);
   // Relationship between two accounts from the first account's viewpoint.
   rpc GetRelationship(GetRelationshipRequest) returns (GetRelationshipResponse);
   // Enforcement answer for a directed interaction (discovery, invitation,
@@ -70,6 +72,12 @@ message Friend {
 }
 
 message ListIncomingRequestsRequest { string account_id = 1; }
+
+message ListOutgoingRequestsRequest { string account_id = 1; }
+
+message ListOutgoingRequestsResponse {
+  repeated Friend addressees = 1;
+}
 
 message ListIncomingRequestsResponse {
   repeated Friend requesters = 1;

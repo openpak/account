@@ -729,6 +729,94 @@ func (x *ListIncomingRequestsRequest) GetAccountId() string {
 	return ""
 }
 
+type ListOutgoingRequestsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOutgoingRequestsRequest) Reset() {
+	*x = ListOutgoingRequestsRequest{}
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOutgoingRequestsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOutgoingRequestsRequest) ProtoMessage() {}
+
+func (x *ListOutgoingRequestsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOutgoingRequestsRequest.ProtoReflect.Descriptor instead.
+func (*ListOutgoingRequestsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListOutgoingRequestsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type ListOutgoingRequestsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Addressees    []*Friend              `protobuf:"bytes,1,rep,name=addressees,proto3" json:"addressees,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOutgoingRequestsResponse) Reset() {
+	*x = ListOutgoingRequestsResponse{}
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOutgoingRequestsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOutgoingRequestsResponse) ProtoMessage() {}
+
+func (x *ListOutgoingRequestsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOutgoingRequestsResponse.ProtoReflect.Descriptor instead.
+func (*ListOutgoingRequestsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListOutgoingRequestsResponse) GetAddressees() []*Friend {
+	if x != nil {
+		return x.Addressees
+	}
+	return nil
+}
+
 type ListIncomingRequestsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Requesters    []*Friend              `protobuf:"bytes,1,rep,name=requesters,proto3" json:"requesters,omitempty"`
@@ -738,7 +826,7 @@ type ListIncomingRequestsResponse struct {
 
 func (x *ListIncomingRequestsResponse) Reset() {
 	*x = ListIncomingRequestsResponse{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[10]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -750,7 +838,7 @@ func (x *ListIncomingRequestsResponse) String() string {
 func (*ListIncomingRequestsResponse) ProtoMessage() {}
 
 func (x *ListIncomingRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[10]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -763,7 +851,7 @@ func (x *ListIncomingRequestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIncomingRequestsResponse.ProtoReflect.Descriptor instead.
 func (*ListIncomingRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{10}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListIncomingRequestsResponse) GetRequesters() []*Friend {
@@ -783,7 +871,7 @@ type GetRelationshipRequest struct {
 
 func (x *GetRelationshipRequest) Reset() {
 	*x = GetRelationshipRequest{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[11]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -795,7 +883,7 @@ func (x *GetRelationshipRequest) String() string {
 func (*GetRelationshipRequest) ProtoMessage() {}
 
 func (x *GetRelationshipRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[11]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -808,7 +896,7 @@ func (x *GetRelationshipRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRelationshipRequest.ProtoReflect.Descriptor instead.
 func (*GetRelationshipRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{11}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetRelationshipRequest) GetAccountId() string {
@@ -834,7 +922,7 @@ type GetRelationshipResponse struct {
 
 func (x *GetRelationshipResponse) Reset() {
 	*x = GetRelationshipResponse{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[12]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -846,7 +934,7 @@ func (x *GetRelationshipResponse) String() string {
 func (*GetRelationshipResponse) ProtoMessage() {}
 
 func (x *GetRelationshipResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[12]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -859,7 +947,7 @@ func (x *GetRelationshipResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRelationshipResponse.ProtoReflect.Descriptor instead.
 func (*GetRelationshipResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{12}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetRelationshipResponse) GetRelationship() Relationship {
@@ -880,7 +968,7 @@ type CheckInteractionRequest struct {
 
 func (x *CheckInteractionRequest) Reset() {
 	*x = CheckInteractionRequest{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[13]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -892,7 +980,7 @@ func (x *CheckInteractionRequest) String() string {
 func (*CheckInteractionRequest) ProtoMessage() {}
 
 func (x *CheckInteractionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[13]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -905,7 +993,7 @@ func (x *CheckInteractionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckInteractionRequest.ProtoReflect.Descriptor instead.
 func (*CheckInteractionRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{13}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CheckInteractionRequest) GetActorId() string {
@@ -939,7 +1027,7 @@ type CheckInteractionResponse struct {
 
 func (x *CheckInteractionResponse) Reset() {
 	*x = CheckInteractionResponse{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[14]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -951,7 +1039,7 @@ func (x *CheckInteractionResponse) String() string {
 func (*CheckInteractionResponse) ProtoMessage() {}
 
 func (x *CheckInteractionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[14]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -964,7 +1052,7 @@ func (x *CheckInteractionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckInteractionResponse.ProtoReflect.Descriptor instead.
 func (*CheckInteractionResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{14}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CheckInteractionResponse) GetAllowed() bool {
@@ -991,7 +1079,7 @@ type BlockRequest struct {
 
 func (x *BlockRequest) Reset() {
 	*x = BlockRequest{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[15]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1003,7 +1091,7 @@ func (x *BlockRequest) String() string {
 func (*BlockRequest) ProtoMessage() {}
 
 func (x *BlockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[15]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1016,7 +1104,7 @@ func (x *BlockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockRequest.ProtoReflect.Descriptor instead.
 func (*BlockRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{15}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *BlockRequest) GetBlockerId() string {
@@ -1041,7 +1129,7 @@ type BlockResponse struct {
 
 func (x *BlockResponse) Reset() {
 	*x = BlockResponse{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[16]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1141,7 @@ func (x *BlockResponse) String() string {
 func (*BlockResponse) ProtoMessage() {}
 
 func (x *BlockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[16]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1154,7 @@ func (x *BlockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockResponse.ProtoReflect.Descriptor instead.
 func (*BlockResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{16}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{18}
 }
 
 type UnblockRequest struct {
@@ -1079,7 +1167,7 @@ type UnblockRequest struct {
 
 func (x *UnblockRequest) Reset() {
 	*x = UnblockRequest{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[17]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1091,7 +1179,7 @@ func (x *UnblockRequest) String() string {
 func (*UnblockRequest) ProtoMessage() {}
 
 func (x *UnblockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[17]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1104,7 +1192,7 @@ func (x *UnblockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockRequest.ProtoReflect.Descriptor instead.
 func (*UnblockRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{17}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UnblockRequest) GetBlockerId() string {
@@ -1129,7 +1217,7 @@ type UnblockResponse struct {
 
 func (x *UnblockResponse) Reset() {
 	*x = UnblockResponse{}
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[18]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1141,7 +1229,7 @@ func (x *UnblockResponse) String() string {
 func (*UnblockResponse) ProtoMessage() {}
 
 func (x *UnblockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[18]
+	mi := &file_proto_openpak_account_v1_social_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1154,7 +1242,7 @@ func (x *UnblockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockResponse.ProtoReflect.Descriptor instead.
 func (*UnblockResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{18}
+	return file_proto_openpak_account_v1_social_proto_rawDescGZIP(), []int{20}
 }
 
 var File_proto_openpak_account_v1_social_proto protoreflect.FileDescriptor
@@ -1191,7 +1279,14 @@ const file_proto_openpak_account_v1_social_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\"<\n" +
 	"\x1bListIncomingRequestsRequest\x12\x1d\n" +
 	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"<\n" +
+	"\x1bListOutgoingRequestsRequest\x12\x1d\n" +
+	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\"Z\n" +
+	"\x1cListOutgoingRequestsResponse\x12:\n" +
+	"\n" +
+	"addressees\x18\x01 \x03(\v2\x1a.openpak.account.v1.FriendR\n" +
+	"addressees\"Z\n" +
 	"\x1cListIncomingRequestsResponse\x12:\n" +
 	"\n" +
 	"requesters\x18\x01 \x03(\v2\x1a.openpak.account.v1.FriendR\n" +
@@ -1244,13 +1339,14 @@ const file_proto_openpak_account_v1_social_proto_rawDesc = "" +
 	"\vFriendState\x12\x1c\n" +
 	"\x18FRIEND_STATE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14FRIEND_STATE_PENDING\x10\x01\x12\x19\n" +
-	"\x15FRIEND_STATE_ACCEPTED\x10\x022\x8c\a\n" +
+	"\x15FRIEND_STATE_ACCEPTED\x10\x022\x87\b\n" +
 	"\x06Social\x12d\n" +
 	"\rRequestFriend\x12(.openpak.account.v1.RequestFriendRequest\x1a).openpak.account.v1.RequestFriendResponse\x12a\n" +
 	"\fAcceptFriend\x12'.openpak.account.v1.AcceptFriendRequest\x1a(.openpak.account.v1.AcceptFriendResponse\x12a\n" +
 	"\fRemoveFriend\x12'.openpak.account.v1.RemoveFriendRequest\x1a(.openpak.account.v1.RemoveFriendResponse\x12^\n" +
 	"\vListFriends\x12&.openpak.account.v1.ListFriendsRequest\x1a'.openpak.account.v1.ListFriendsResponse\x12y\n" +
-	"\x14ListIncomingRequests\x12/.openpak.account.v1.ListIncomingRequestsRequest\x1a0.openpak.account.v1.ListIncomingRequestsResponse\x12j\n" +
+	"\x14ListIncomingRequests\x12/.openpak.account.v1.ListIncomingRequestsRequest\x1a0.openpak.account.v1.ListIncomingRequestsResponse\x12y\n" +
+	"\x14ListOutgoingRequests\x12/.openpak.account.v1.ListOutgoingRequestsRequest\x1a0.openpak.account.v1.ListOutgoingRequestsResponse\x12j\n" +
 	"\x0fGetRelationship\x12*.openpak.account.v1.GetRelationshipRequest\x1a+.openpak.account.v1.GetRelationshipResponse\x12m\n" +
 	"\x10CheckInteraction\x12+.openpak.account.v1.CheckInteractionRequest\x1a,.openpak.account.v1.CheckInteractionResponse\x12L\n" +
 	"\x05Block\x12 .openpak.account.v1.BlockRequest\x1a!.openpak.account.v1.BlockResponse\x12R\n" +
@@ -1269,7 +1365,7 @@ func file_proto_openpak_account_v1_social_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_openpak_account_v1_social_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_proto_openpak_account_v1_social_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_proto_openpak_account_v1_social_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_proto_openpak_account_v1_social_proto_goTypes = []any{
 	(Relationship)(0),                    // 0: openpak.account.v1.Relationship
 	(InteractionKind)(0),                 // 1: openpak.account.v1.InteractionKind
@@ -1285,47 +1381,52 @@ var file_proto_openpak_account_v1_social_proto_goTypes = []any{
 	(*ListFriendsResponse)(nil),          // 11: openpak.account.v1.ListFriendsResponse
 	(*Friend)(nil),                       // 12: openpak.account.v1.Friend
 	(*ListIncomingRequestsRequest)(nil),  // 13: openpak.account.v1.ListIncomingRequestsRequest
-	(*ListIncomingRequestsResponse)(nil), // 14: openpak.account.v1.ListIncomingRequestsResponse
-	(*GetRelationshipRequest)(nil),       // 15: openpak.account.v1.GetRelationshipRequest
-	(*GetRelationshipResponse)(nil),      // 16: openpak.account.v1.GetRelationshipResponse
-	(*CheckInteractionRequest)(nil),      // 17: openpak.account.v1.CheckInteractionRequest
-	(*CheckInteractionResponse)(nil),     // 18: openpak.account.v1.CheckInteractionResponse
-	(*BlockRequest)(nil),                 // 19: openpak.account.v1.BlockRequest
-	(*BlockResponse)(nil),                // 20: openpak.account.v1.BlockResponse
-	(*UnblockRequest)(nil),               // 21: openpak.account.v1.UnblockRequest
-	(*UnblockResponse)(nil),              // 22: openpak.account.v1.UnblockResponse
+	(*ListOutgoingRequestsRequest)(nil),  // 14: openpak.account.v1.ListOutgoingRequestsRequest
+	(*ListOutgoingRequestsResponse)(nil), // 15: openpak.account.v1.ListOutgoingRequestsResponse
+	(*ListIncomingRequestsResponse)(nil), // 16: openpak.account.v1.ListIncomingRequestsResponse
+	(*GetRelationshipRequest)(nil),       // 17: openpak.account.v1.GetRelationshipRequest
+	(*GetRelationshipResponse)(nil),      // 18: openpak.account.v1.GetRelationshipResponse
+	(*CheckInteractionRequest)(nil),      // 19: openpak.account.v1.CheckInteractionRequest
+	(*CheckInteractionResponse)(nil),     // 20: openpak.account.v1.CheckInteractionResponse
+	(*BlockRequest)(nil),                 // 21: openpak.account.v1.BlockRequest
+	(*BlockResponse)(nil),                // 22: openpak.account.v1.BlockResponse
+	(*UnblockRequest)(nil),               // 23: openpak.account.v1.UnblockRequest
+	(*UnblockResponse)(nil),              // 24: openpak.account.v1.UnblockResponse
 }
 var file_proto_openpak_account_v1_social_proto_depIdxs = []int32{
 	3,  // 0: openpak.account.v1.RequestFriendResponse.state:type_name -> openpak.account.v1.FriendState
 	3,  // 1: openpak.account.v1.AcceptFriendResponse.state:type_name -> openpak.account.v1.FriendState
 	12, // 2: openpak.account.v1.ListFriendsResponse.friends:type_name -> openpak.account.v1.Friend
-	12, // 3: openpak.account.v1.ListIncomingRequestsResponse.requesters:type_name -> openpak.account.v1.Friend
-	0,  // 4: openpak.account.v1.GetRelationshipResponse.relationship:type_name -> openpak.account.v1.Relationship
-	1,  // 5: openpak.account.v1.CheckInteractionRequest.kind:type_name -> openpak.account.v1.InteractionKind
-	2,  // 6: openpak.account.v1.CheckInteractionResponse.reason:type_name -> openpak.account.v1.DenialReason
-	4,  // 7: openpak.account.v1.Social.RequestFriend:input_type -> openpak.account.v1.RequestFriendRequest
-	6,  // 8: openpak.account.v1.Social.AcceptFriend:input_type -> openpak.account.v1.AcceptFriendRequest
-	8,  // 9: openpak.account.v1.Social.RemoveFriend:input_type -> openpak.account.v1.RemoveFriendRequest
-	10, // 10: openpak.account.v1.Social.ListFriends:input_type -> openpak.account.v1.ListFriendsRequest
-	13, // 11: openpak.account.v1.Social.ListIncomingRequests:input_type -> openpak.account.v1.ListIncomingRequestsRequest
-	15, // 12: openpak.account.v1.Social.GetRelationship:input_type -> openpak.account.v1.GetRelationshipRequest
-	17, // 13: openpak.account.v1.Social.CheckInteraction:input_type -> openpak.account.v1.CheckInteractionRequest
-	19, // 14: openpak.account.v1.Social.Block:input_type -> openpak.account.v1.BlockRequest
-	21, // 15: openpak.account.v1.Social.Unblock:input_type -> openpak.account.v1.UnblockRequest
-	5,  // 16: openpak.account.v1.Social.RequestFriend:output_type -> openpak.account.v1.RequestFriendResponse
-	7,  // 17: openpak.account.v1.Social.AcceptFriend:output_type -> openpak.account.v1.AcceptFriendResponse
-	9,  // 18: openpak.account.v1.Social.RemoveFriend:output_type -> openpak.account.v1.RemoveFriendResponse
-	11, // 19: openpak.account.v1.Social.ListFriends:output_type -> openpak.account.v1.ListFriendsResponse
-	14, // 20: openpak.account.v1.Social.ListIncomingRequests:output_type -> openpak.account.v1.ListIncomingRequestsResponse
-	16, // 21: openpak.account.v1.Social.GetRelationship:output_type -> openpak.account.v1.GetRelationshipResponse
-	18, // 22: openpak.account.v1.Social.CheckInteraction:output_type -> openpak.account.v1.CheckInteractionResponse
-	20, // 23: openpak.account.v1.Social.Block:output_type -> openpak.account.v1.BlockResponse
-	22, // 24: openpak.account.v1.Social.Unblock:output_type -> openpak.account.v1.UnblockResponse
-	16, // [16:25] is the sub-list for method output_type
-	7,  // [7:16] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	12, // 3: openpak.account.v1.ListOutgoingRequestsResponse.addressees:type_name -> openpak.account.v1.Friend
+	12, // 4: openpak.account.v1.ListIncomingRequestsResponse.requesters:type_name -> openpak.account.v1.Friend
+	0,  // 5: openpak.account.v1.GetRelationshipResponse.relationship:type_name -> openpak.account.v1.Relationship
+	1,  // 6: openpak.account.v1.CheckInteractionRequest.kind:type_name -> openpak.account.v1.InteractionKind
+	2,  // 7: openpak.account.v1.CheckInteractionResponse.reason:type_name -> openpak.account.v1.DenialReason
+	4,  // 8: openpak.account.v1.Social.RequestFriend:input_type -> openpak.account.v1.RequestFriendRequest
+	6,  // 9: openpak.account.v1.Social.AcceptFriend:input_type -> openpak.account.v1.AcceptFriendRequest
+	8,  // 10: openpak.account.v1.Social.RemoveFriend:input_type -> openpak.account.v1.RemoveFriendRequest
+	10, // 11: openpak.account.v1.Social.ListFriends:input_type -> openpak.account.v1.ListFriendsRequest
+	13, // 12: openpak.account.v1.Social.ListIncomingRequests:input_type -> openpak.account.v1.ListIncomingRequestsRequest
+	14, // 13: openpak.account.v1.Social.ListOutgoingRequests:input_type -> openpak.account.v1.ListOutgoingRequestsRequest
+	17, // 14: openpak.account.v1.Social.GetRelationship:input_type -> openpak.account.v1.GetRelationshipRequest
+	19, // 15: openpak.account.v1.Social.CheckInteraction:input_type -> openpak.account.v1.CheckInteractionRequest
+	21, // 16: openpak.account.v1.Social.Block:input_type -> openpak.account.v1.BlockRequest
+	23, // 17: openpak.account.v1.Social.Unblock:input_type -> openpak.account.v1.UnblockRequest
+	5,  // 18: openpak.account.v1.Social.RequestFriend:output_type -> openpak.account.v1.RequestFriendResponse
+	7,  // 19: openpak.account.v1.Social.AcceptFriend:output_type -> openpak.account.v1.AcceptFriendResponse
+	9,  // 20: openpak.account.v1.Social.RemoveFriend:output_type -> openpak.account.v1.RemoveFriendResponse
+	11, // 21: openpak.account.v1.Social.ListFriends:output_type -> openpak.account.v1.ListFriendsResponse
+	16, // 22: openpak.account.v1.Social.ListIncomingRequests:output_type -> openpak.account.v1.ListIncomingRequestsResponse
+	15, // 23: openpak.account.v1.Social.ListOutgoingRequests:output_type -> openpak.account.v1.ListOutgoingRequestsResponse
+	18, // 24: openpak.account.v1.Social.GetRelationship:output_type -> openpak.account.v1.GetRelationshipResponse
+	20, // 25: openpak.account.v1.Social.CheckInteraction:output_type -> openpak.account.v1.CheckInteractionResponse
+	22, // 26: openpak.account.v1.Social.Block:output_type -> openpak.account.v1.BlockResponse
+	24, // 27: openpak.account.v1.Social.Unblock:output_type -> openpak.account.v1.UnblockResponse
+	18, // [18:28] is the sub-list for method output_type
+	8,  // [8:18] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_proto_openpak_account_v1_social_proto_init() }
@@ -1339,7 +1440,7 @@ func file_proto_openpak_account_v1_social_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_openpak_account_v1_social_proto_rawDesc), len(file_proto_openpak_account_v1_social_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

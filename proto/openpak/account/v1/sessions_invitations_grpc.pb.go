@@ -257,6 +257,7 @@ var Sessions_ServiceDesc = grpc.ServiceDesc{
 const (
 	Invitations_SendInvitation_FullMethodName  = "/openpak.account.v1.Invitations/SendInvitation"
 	Invitations_PollInvitations_FullMethodName = "/openpak.account.v1.Invitations/PollInvitations"
+	Invitations_AckInvitations_FullMethodName  = "/openpak.account.v1.Invitations/AckInvitations"
 )
 
 // InvitationsClient is the client API for Invitations service.
@@ -264,14 +265,20 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type InvitationsClient interface {
 	// Deliver an invitation to a live session. The core enforces CheckInteraction
-	// rules, stamps expiry and a nonce (replay rejection), and requires a live
-	// session for the target account + title.
+	// rules, stamps expiry and a nonce (replay rejection), requires a live
+	// session for the target account + title, and binds the invitation to that
+	// session (delivery fails if the session is replaced, expired, or removed;
+	// blocks are re-checked at delivery time).
 	SendInvitation(ctx context.Context, in *SendInvitationRequest, opts ...grpc.CallOption) (*SendInvitationResponse, error)
 	// Poll pending invitations for an account on one adapter namespace.
-	// Returned invitations are marked delivered; expired ones are skipped and
-	// reaped. Delivery is at-least-once only under caller retry before marking;
-	// callers apply idempotently (PRD §7 event semantics).
+	// Delivery is at-least-once: returned invitations stay pending for a
+	// redelivery window (60 s) until acknowledged, so a lost response is
+	// recovered by polling again. Expired or policy-invalid invitations are
+	// reaped/rejected server-side before delivery.
 	PollInvitations(ctx context.Context, in *PollInvitationsRequest, opts ...grpc.CallOption) (*PollInvitationsResponse, error)
+	// Acknowledge received invitations (id + nonce pairs). Only pending
+	// invitations matching namespace/account/nonce are marked delivered.
+	AckInvitations(ctx context.Context, in *AckInvitationsRequest, opts ...grpc.CallOption) (*AckInvitationsResponse, error)
 }
 
 type invitationsClient struct {
@@ -302,19 +309,35 @@ func (c *invitationsClient) PollInvitations(ctx context.Context, in *PollInvitat
 	return out, nil
 }
 
+func (c *invitationsClient) AckInvitations(ctx context.Context, in *AckInvitationsRequest, opts ...grpc.CallOption) (*AckInvitationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AckInvitationsResponse)
+	err := c.cc.Invoke(ctx, Invitations_AckInvitations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InvitationsServer is the server API for Invitations service.
 // All implementations must embed UnimplementedInvitationsServer
 // for forward compatibility.
 type InvitationsServer interface {
 	// Deliver an invitation to a live session. The core enforces CheckInteraction
-	// rules, stamps expiry and a nonce (replay rejection), and requires a live
-	// session for the target account + title.
+	// rules, stamps expiry and a nonce (replay rejection), requires a live
+	// session for the target account + title, and binds the invitation to that
+	// session (delivery fails if the session is replaced, expired, or removed;
+	// blocks are re-checked at delivery time).
 	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
 	// Poll pending invitations for an account on one adapter namespace.
-	// Returned invitations are marked delivered; expired ones are skipped and
-	// reaped. Delivery is at-least-once only under caller retry before marking;
-	// callers apply idempotently (PRD §7 event semantics).
+	// Delivery is at-least-once: returned invitations stay pending for a
+	// redelivery window (60 s) until acknowledged, so a lost response is
+	// recovered by polling again. Expired or policy-invalid invitations are
+	// reaped/rejected server-side before delivery.
 	PollInvitations(context.Context, *PollInvitationsRequest) (*PollInvitationsResponse, error)
+	// Acknowledge received invitations (id + nonce pairs). Only pending
+	// invitations matching namespace/account/nonce are marked delivered.
+	AckInvitations(context.Context, *AckInvitationsRequest) (*AckInvitationsResponse, error)
 	mustEmbedUnimplementedInvitationsServer()
 }
 
@@ -330,6 +353,9 @@ func (UnimplementedInvitationsServer) SendInvitation(context.Context, *SendInvit
 }
 func (UnimplementedInvitationsServer) PollInvitations(context.Context, *PollInvitationsRequest) (*PollInvitationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PollInvitations not implemented")
+}
+func (UnimplementedInvitationsServer) AckInvitations(context.Context, *AckInvitationsRequest) (*AckInvitationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AckInvitations not implemented")
 }
 func (UnimplementedInvitationsServer) mustEmbedUnimplementedInvitationsServer() {}
 func (UnimplementedInvitationsServer) testEmbeddedByValue()                     {}
@@ -388,6 +414,24 @@ func _Invitations_PollInvitations_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Invitations_AckInvitations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AckInvitationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvitationsServer).AckInvitations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Invitations_AckInvitations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvitationsServer).AckInvitations(ctx, req.(*AckInvitationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Invitations_ServiceDesc is the grpc.ServiceDesc for Invitations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -402,6 +446,10 @@ var Invitations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PollInvitations",
 			Handler:    _Invitations_PollInvitations_Handler,
+		},
+		{
+			MethodName: "AckInvitations",
+			Handler:    _Invitations_AckInvitations_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

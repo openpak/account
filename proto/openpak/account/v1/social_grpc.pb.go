@@ -24,6 +24,7 @@ const (
 	Social_RemoveFriend_FullMethodName         = "/openpak.account.v1.Social/RemoveFriend"
 	Social_ListFriends_FullMethodName          = "/openpak.account.v1.Social/ListFriends"
 	Social_ListIncomingRequests_FullMethodName = "/openpak.account.v1.Social/ListIncomingRequests"
+	Social_ListOutgoingRequests_FullMethodName = "/openpak.account.v1.Social/ListOutgoingRequests"
 	Social_GetRelationship_FullMethodName      = "/openpak.account.v1.Social/GetRelationship"
 	Social_CheckInteraction_FullMethodName     = "/openpak.account.v1.Social/CheckInteraction"
 	Social_Block_FullMethodName                = "/openpak.account.v1.Social/Block"
@@ -49,6 +50,8 @@ type SocialClient interface {
 	ListFriends(ctx context.Context, in *ListFriendsRequest, opts ...grpc.CallOption) (*ListFriendsResponse, error)
 	// Pending incoming requests for an account.
 	ListIncomingRequests(ctx context.Context, in *ListIncomingRequestsRequest, opts ...grpc.CallOption) (*ListIncomingRequestsResponse, error)
+	// Pending requests the account SENT (Wii U protocol needs both sides).
+	ListOutgoingRequests(ctx context.Context, in *ListOutgoingRequestsRequest, opts ...grpc.CallOption) (*ListOutgoingRequestsResponse, error)
 	// Relationship between two accounts from the first account's viewpoint.
 	GetRelationship(ctx context.Context, in *GetRelationshipRequest, opts ...grpc.CallOption) (*GetRelationshipResponse, error)
 	// Enforcement answer for a directed interaction (discovery, invitation,
@@ -120,6 +123,16 @@ func (c *socialClient) ListIncomingRequests(ctx context.Context, in *ListIncomin
 	return out, nil
 }
 
+func (c *socialClient) ListOutgoingRequests(ctx context.Context, in *ListOutgoingRequestsRequest, opts ...grpc.CallOption) (*ListOutgoingRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOutgoingRequestsResponse)
+	err := c.cc.Invoke(ctx, Social_ListOutgoingRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *socialClient) GetRelationship(ctx context.Context, in *GetRelationshipRequest, opts ...grpc.CallOption) (*GetRelationshipResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetRelationshipResponse)
@@ -179,6 +192,8 @@ type SocialServer interface {
 	ListFriends(context.Context, *ListFriendsRequest) (*ListFriendsResponse, error)
 	// Pending incoming requests for an account.
 	ListIncomingRequests(context.Context, *ListIncomingRequestsRequest) (*ListIncomingRequestsResponse, error)
+	// Pending requests the account SENT (Wii U protocol needs both sides).
+	ListOutgoingRequests(context.Context, *ListOutgoingRequestsRequest) (*ListOutgoingRequestsResponse, error)
 	// Relationship between two accounts from the first account's viewpoint.
 	GetRelationship(context.Context, *GetRelationshipRequest) (*GetRelationshipResponse, error)
 	// Enforcement answer for a directed interaction (discovery, invitation,
@@ -214,6 +229,9 @@ func (UnimplementedSocialServer) ListFriends(context.Context, *ListFriendsReques
 }
 func (UnimplementedSocialServer) ListIncomingRequests(context.Context, *ListIncomingRequestsRequest) (*ListIncomingRequestsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListIncomingRequests not implemented")
+}
+func (UnimplementedSocialServer) ListOutgoingRequests(context.Context, *ListOutgoingRequestsRequest) (*ListOutgoingRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOutgoingRequests not implemented")
 }
 func (UnimplementedSocialServer) GetRelationship(context.Context, *GetRelationshipRequest) (*GetRelationshipResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRelationship not implemented")
@@ -338,6 +356,24 @@ func _Social_ListIncomingRequests_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Social_ListOutgoingRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOutgoingRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SocialServer).ListOutgoingRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Social_ListOutgoingRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SocialServer).ListOutgoingRequests(ctx, req.(*ListOutgoingRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Social_GetRelationship_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRelationshipRequest)
 	if err := dec(in); err != nil {
@@ -436,6 +472,10 @@ var Social_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListIncomingRequests",
 			Handler:    _Social_ListIncomingRequests_Handler,
+		},
+		{
+			MethodName: "ListOutgoingRequests",
+			Handler:    _Social_ListOutgoingRequests_Handler,
 		},
 		{
 			MethodName: "GetRelationship",

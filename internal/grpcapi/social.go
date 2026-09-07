@@ -177,3 +177,18 @@ func protoRelationship(r social.Relationship) accountv1.Relationship {
 		return accountv1.Relationship_RELATIONSHIP_NONE
 	}
 }
+
+func (s *Server) ListOutgoingRequests(ctx context.Context, req *accountv1.ListOutgoingRequestsRequest) (*accountv1.ListOutgoingRequestsResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	reqs, err := s.social.ListOutgoingRequests(ctx, req.GetAccountId())
+	if err != nil {
+		return nil, mapSocialErr(err)
+	}
+	resp := &accountv1.ListOutgoingRequestsResponse{}
+	for _, f := range reqs {
+		resp.Addressees = append(resp.Addressees, &accountv1.Friend{AccountId: f.AccountID, DisplayName: f.DisplayName})
+	}
+	return resp, nil
+}

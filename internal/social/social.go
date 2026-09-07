@@ -261,22 +261,40 @@ func (s *Service) GetRelationship(ctx context.Context, accountID, otherID string
 	return RelNone, nil
 }
 
+// Querier is the minimal query surface shared by pool connections and
+// transactions, letting callers run policy checks inside their own
+// transaction instead of checking out a second pool connection.
+type Querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
 // CheckInteraction answers whether actor may interact with target. v1 rule:
 // every kind requires an accepted friendship, no block in either direction,
 // and both accounts active (friends-only discovery and invitations match the
 // first-wave titles; privacy broadening is future work — SP-5).
 func (s *Service) CheckInteraction(ctx context.Context, actorID, targetID string) (bool, string, error) {
+	return CheckInteractionQ(ctx, s.pool, actorID, targetID)
+}
+
+// CheckInteractionTx implements invitations.Checker's transaction-aware form.
+func (s *Service) CheckInteractionTx(ctx context.Context, tx pgx.Tx, actorID, targetID string) (bool, string, error) {
+	return CheckInteractionQ(ctx, tx, actorID, targetID)
+}
+
+// CheckInteractionQ is CheckInteraction against an explicit querier so it can
+// run inside a caller's transaction (pool-exhaustion safety in Poll).
+func CheckInteractionQ(ctx context.Context, q Querier, actorID, targetID string) (bool, string, error) {
 	if actorID == "" || targetID == "" {
 		return false, "invalid", ErrInvalid
 	}
 	if actorID == targetID {
 		return false, "self", ErrSelfRequest
 	}
-	actorOK, err := accountActive(ctx, s.pool, actorID)
+	actorOK, err := accountActive(ctx, q, actorID)
 	if err != nil {
 		return false, "", err
 	}
-	targetOK, err := accountActive(ctx, s.pool, targetID)
+	targetOK, err := accountActive(ctx, q, targetID)
 	if err != nil {
 		return false, "", err
 	}
@@ -284,7 +302,7 @@ func (s *Service) CheckInteraction(ctx context.Context, actorID, targetID string
 		return false, "account_inactive", nil
 	}
 	var blocked bool
-	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM account_blocks
+	if err := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM account_blocks
 			WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1))`,
 		actorID, targetID).Scan(&blocked); err != nil {
 		return false, "", err
@@ -293,7 +311,7 @@ func (s *Service) CheckInteraction(ctx context.Context, actorID, targetID string
 		return false, "blocked", nil
 	}
 	var friends bool
-	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM friendships
+	if err := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM friendships
 			WHERE state='accepted'
 			AND ((requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)))`,
 		actorID, targetID).Scan(&friends); err != nil {
@@ -362,4 +380,24 @@ func accountActive(ctx context.Context, q interface {
 	var ok bool
 	err := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM accounts WHERE id=$1 AND status='active')`, id).Scan(&ok)
 	return ok, err
+}
+
+// ListOutgoingRequests returns pending requests the account sent.
+func (s *Service) ListOutgoingRequests(ctx context.Context, accountID string) ([]Friend, error) {
+	rows, err := s.pool.Query(ctx, `SELECT f.addressee_id, acc.display_name
+		FROM friendships f JOIN accounts acc ON acc.id = f.addressee_id
+		WHERE f.requester_id=$1 AND f.state='pending' ORDER BY f.created_at`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Friend
+	for rows.Next() {
+		var f Friend
+		if err := rows.Scan(&f.AccountID, &f.DisplayName); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
 }
