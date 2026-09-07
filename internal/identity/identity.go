@@ -307,6 +307,43 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	})
 }
 
+// ChangePassword rotates the password of a signed-in account. The current password is
+// required: a stolen session should not be enough to lock the owner out of their own account.
+// Every other session is revoked, matching ResetPassword (FR-1); the caller's own session is
+// kept, since the user is standing right there and just proved who they are.
+func (s *Service) ChangePassword(ctx context.Context, accountID, current, next, keepSessionToken string) error {
+	if _, err := s.VerifyByID(ctx, accountID, current); err != nil {
+		return err
+	}
+	if len(next) < 8 || len(next) > maxPasswordLen {
+		return errors.New("identity: password must be 8-128 characters")
+	}
+	if next == current {
+		return errors.New("identity: the new password must be different")
+	}
+	hash, err := hashPassword(s.pepper, next)
+	if err != nil {
+		return err
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx,
+		`UPDATE accounts SET password_hash = $2, updated_at = now() WHERE id = $1`, accountID, string(hash)); err != nil {
+		return err
+	}
+	// Sessions are addressed by token hash, not by the cookie value: comparing the raw token
+	// against id would match nothing and revoke the caller's own session too.
+	if _, err := tx.Exec(ctx,
+		`UPDATE sessions SET revoked_at = now() WHERE account_id = $1 AND revoked_at IS NULL AND token_hash <> $2`,
+		accountID, hashToken(keepSessionToken, s.pepper)); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (s *Service) issueToken(ctx context.Context, accountID, purpose string) (string, error) {
 	return s.issueTokenOpts(ctx, accountID, purpose, false)
 }

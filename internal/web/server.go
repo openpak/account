@@ -37,6 +37,7 @@ func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string)
 	s.mux.HandleFunc("POST /v1/logout", s.auth(s.handleLogout))
 	s.mux.HandleFunc("GET /v1/sessions", s.auth(s.handleListSessions))
 	s.mux.HandleFunc("DELETE /v1/sessions/{id}", s.auth(s.handleRevokeSession))
+	s.mux.HandleFunc("POST /v1/change-password", s.auth(s.handleChangePassword))
 	s.mux.HandleFunc("POST /v1/forgot-password", s.handleForgotPassword)
 	s.mux.HandleFunc("POST /v1/reset-password", s.handleResetPassword)
 	s.mux.HandleFunc("GET /v1/reset-password", s.handleResetPasswordPage)
@@ -311,4 +312,26 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func writeError(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": strings.ToLower(msg[:1]) + msg[1:]})
+}
+
+// handleChangePassword rotates the signed-in account's password. Requires the current one, so
+// a hijacked session cannot take the account over.
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
+	var req struct {
+		Current string `json:"current_password"`
+		New     string `json:"new_password"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	// Keep the caller's own session alive; every other one is revoked inside ChangePassword.
+	keep := ""
+	if c, err := r.Cookie(sessionCookieName); err == nil {
+		keep = c.Value
+	}
+	if err := s.identity.ChangePassword(r.Context(), acct.ID, req.Current, req.New, keep); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"message": "password changed"})
 }
