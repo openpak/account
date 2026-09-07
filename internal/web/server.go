@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"openpak/account/internal/emaillink"
+	"os"
 	"strings"
 	"time"
 
@@ -42,6 +45,13 @@ func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string)
 	s.mux.HandleFunc("POST /v1/reset-password", s.handleResetPassword)
 	s.mux.HandleFunc("GET /v1/reset-password", s.handleResetPasswordPage)
 	s.mux.HandleFunc("POST /v1/reset-password/confirm", s.handleResetPasswordForm)
+	// Console linking: the page lives in the Switch adapter, but a phone scanning the QR needs
+	// a name with a certificate it trusts — a bare IP gives a warning page, and
+	// accounts.nintendo.com resolves only on the console itself. Only /link is forwarded.
+	if adapter := os.Getenv("ADAPTER_LINK_URL"); adapter != "" {
+		s.mux.Handle("/link", adapterProxy(adapter))
+		s.mux.Handle("/link/", adapterProxy(adapter))
+	}
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 	s.mux.HandleFunc("GET /readyz", s.handleHealth)
 	return s
@@ -334,4 +344,20 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, ac
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"message": "password changed"})
+}
+
+// adapterProxy forwards the console-link page to the Switch adapter under this service's own
+// certificate.
+func adapterProxy(target string) http.Handler {
+	u, err := url.Parse(target)
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "link service is not configured", http.StatusServiceUnavailable)
+		})
+	}
+	proxy := httputil.NewSingleHostReverseProxy(u)
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, "the link service is unavailable", http.StatusBadGateway)
+	}
+	return proxy
 }
