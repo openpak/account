@@ -39,18 +39,22 @@ type Server struct {
 	invitations *invitations.Service
 	mailer      *mailer.Mailer
 	baseURL     string
+	siteBaseURL string
 }
 
 type Options struct {
 	Mailer  *mailer.Mailer // nil = development mode (tokens returned to callers)
-	BaseURL string         // public web base URL for email links
+	BaseURL string         // the core's own public base URL
+	// SiteBaseURL is the user-facing site (ACCOUNT_EMAIL_LINK_BASE). When set, emailed
+	// links point at its routes instead of the core's, so the core can stay internal.
+	SiteBaseURL string
 }
 
 func New(ident *identity.Service, lnks *links.Service, evs *events.Service, soc *social.Service, sess *sessions.Service, inv *invitations.Service, opts Options) *Server {
 	if opts.BaseURL == "" {
 		opts.BaseURL = "http://localhost:8000"
 	}
-	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL}
+	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL, siteBaseURL: opts.SiteBaseURL}
 }
 
 func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsRequest) (*accountv1.PollEventsResponse, error) {

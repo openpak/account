@@ -2,6 +2,7 @@ package grpcapi
 
 import (
 	"context"
+	"openpak/account/internal/emaillink"
 	"strings"
 
 	"google.golang.org/grpc/codes"
@@ -29,7 +30,7 @@ func (s *Server) RegisterAccount(ctx context.Context, req *accountv1.RegisterAcc
 			if token := s.identity.ResendVerificationIfUnverified(ctx, req.GetEmail(), req.GetPassword()); token != "" && s.mailer != nil {
 				_ = s.mailer.Send(strings.ToLower(strings.TrimSpace(req.GetEmail())),
 					"Confirm your OpenPak email",
-					"Confirm your email address: "+s.baseURL+"/v1/verify?token="+token)
+					"Confirm your email address: "+emaillink.Build(s.baseURL, s.siteBaseURL, emaillink.Verify, token))
 			}
 			// Do not confirm or deny registration to the console user; the
 			// adapter surfaces its protocol-appropriate generic error.
@@ -43,7 +44,7 @@ func (s *Server) RegisterAccount(ctx context.Context, req *accountv1.RegisterAcc
 		resp.VerificationToken = token
 		return resp, nil
 	}
-	verifyURL := s.baseURL + "/v1/verify?token=" + token
+	verifyURL := emaillink.Build(s.baseURL, s.siteBaseURL, emaillink.Verify, token)
 	body := "Welcome to OpenPak!\n\nConfirm your email address by opening this link:\n" + verifyURL +
 		"\n\nIf you did not create this account, ignore this message."
 	if err := s.mailer.Send(acct.Email, "Confirm your OpenPak email", body); err != nil {

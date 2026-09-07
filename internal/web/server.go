@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"openpak/account/internal/emaillink"
 	"strings"
 	"time"
 
@@ -20,14 +21,16 @@ type Server struct {
 	// non-nil values and panicked (review follow-up P1 #1).
 	mailer  *mailer.Mailer // nil = development mode: tokens returned in responses
 	baseURL string
-	mux     *http.ServeMux
+	// siteBaseURL: see grpcapi.Options.SiteBaseURL — emailed links point at the site.
+	siteBaseURL string
+	mux         *http.ServeMux
 }
 
-func New(ident *identity.Service, m *mailer.Mailer, baseURL string) *Server {
+func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string) *Server {
 	if baseURL == "" {
 		baseURL = "http://localhost:8000"
 	}
-	s := &Server{identity: ident, mailer: m, baseURL: baseURL, mux: http.NewServeMux()}
+	s := &Server{identity: ident, mailer: m, baseURL: baseURL, siteBaseURL: siteBaseURL, mux: http.NewServeMux()}
 	s.mux.HandleFunc("POST /v1/register", s.handleRegister)
 	s.mux.HandleFunc("GET /v1/verify", s.handleVerify)
 	s.mux.HandleFunc("POST /v1/login", s.handleLogin)
@@ -115,7 +118,7 @@ func normalizeEmailAddress(email string) string {
 }
 
 func (s *Server) sendVerificationEmail(to, displayName, token string) error {
-	link := s.baseURL + "/v1/verify?token=" + token
+	link := emaillink.Build(s.baseURL, s.siteBaseURL, emaillink.Verify, token)
 	body := "Hi " + displayName + ",\n\nConfirm your OpenPak account email address:\n" + link +
 		"\n\nIf you did not create this account, ignore this message."
 	return s.mailer.Send(to, "Confirm your OpenPak email", body)
@@ -223,7 +226,7 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) sendPasswordResetEmail(to, token string) error {
-	link := s.baseURL + "/v1/reset-password?token=" + token
+	link := emaillink.Build(s.baseURL, s.siteBaseURL, emaillink.ResetPassword, token)
 	body := "A password reset was requested for your OpenPak account.\n\n" +
 		"Open this link to choose a new password:\n" + link +
 		"\n\nThe link expires in 24 hours and can be used once.\n" +
