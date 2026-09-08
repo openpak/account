@@ -196,7 +196,7 @@ func (s *Server) GetPlayerCounts(ctx context.Context, _ *accountv1.GetPlayerCoun
 	if err := s.authorize(ctx); err != nil {
 		return nil, err
 	}
-	titles, total, err := s.sessions.PlayerCounts(ctx)
+	titles, networks, total, err := s.sessions.PlayerCounts(ctx)
 	if err != nil {
 		return nil, mapSessionErr(err)
 	}
@@ -204,6 +204,11 @@ func (s *Server) GetPlayerCounts(ctx context.Context, _ *accountv1.GetPlayerCoun
 	for _, t := range titles {
 		resp.Titles = append(resp.Titles, &accountv1.TitlePlayers{
 			TitleId: t.TitleID, Namespace: t.Namespace, Players: int32(t.Players),
+		})
+	}
+	for _, n := range networks {
+		resp.Networks = append(resp.Networks, &accountv1.NetworkPlayers{
+			Namespace: n.Namespace, Players: int32(n.Players),
 		})
 	}
 	return resp, nil

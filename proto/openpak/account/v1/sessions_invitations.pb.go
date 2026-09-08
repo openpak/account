@@ -1336,9 +1336,13 @@ func (*GetPlayerCountsRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetPlayerCountsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Titles        []*TitlePlayers        `protobuf:"bytes,1,rep,name=titles,proto3" json:"titles,omitempty"`
-	TotalPlayers  int32                  `protobuf:"varint,2,opt,name=total_players,json=totalPlayers,proto3" json:"total_players,omitempty"` // distinct accounts, not the sum of the rows
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Titles       []*TitlePlayers        `protobuf:"bytes,1,rep,name=titles,proto3" json:"titles,omitempty"`
+	TotalPlayers int32                  `protobuf:"varint,2,opt,name=total_players,json=totalPlayers,proto3" json:"total_players,omitempty"` // distinct accounts, not the sum of the rows
+	// Per adapter namespace: one entry per console network with anybody on it.
+	// Also distinct accounts, so someone playing two titles on the same network
+	// is one player there.
+	Networks      []*NetworkPlayers `protobuf:"bytes,3,rep,name=networks,proto3" json:"networks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1387,6 +1391,65 @@ func (x *GetPlayerCountsResponse) GetTotalPlayers() int32 {
 	return 0
 }
 
+func (x *GetPlayerCountsResponse) GetNetworks() []*NetworkPlayers {
+	if x != nil {
+		return x.Networks
+	}
+	return nil
+}
+
+type NetworkPlayers struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Players       int32                  `protobuf:"varint,2,opt,name=players,proto3" json:"players,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetworkPlayers) Reset() {
+	*x = NetworkPlayers{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetworkPlayers) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetworkPlayers) ProtoMessage() {}
+
+func (x *NetworkPlayers) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetworkPlayers.ProtoReflect.Descriptor instead.
+func (*NetworkPlayers) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *NetworkPlayers) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *NetworkPlayers) GetPlayers() int32 {
+	if x != nil {
+		return x.Players
+	}
+	return 0
+}
+
 type TitlePlayers struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TitleId       string                 `protobuf:"bytes,1,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
@@ -1398,7 +1461,7 @@ type TitlePlayers struct {
 
 func (x *TitlePlayers) Reset() {
 	*x = TitlePlayers{}
-	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[25]
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1410,7 +1473,7 @@ func (x *TitlePlayers) String() string {
 func (*TitlePlayers) ProtoMessage() {}
 
 func (x *TitlePlayers) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[25]
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1423,7 +1486,7 @@ func (x *TitlePlayers) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TitlePlayers.ProtoReflect.Descriptor instead.
 func (*TitlePlayers) Descriptor() ([]byte, []int) {
-	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{25}
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *TitlePlayers) GetTitleId() string {
@@ -1546,10 +1609,14 @@ const file_openpak_account_v1_sessions_invitations_proto_rawDesc = "" +
 	"\rinvitation_id\x18\x02 \x01(\tR\finvitationId\"6\n" +
 	"\x18RejectInvitationResponse\x12\x1a\n" +
 	"\brejected\x18\x01 \x01(\bR\brejected\"\x18\n" +
-	"\x16GetPlayerCountsRequest\"x\n" +
+	"\x16GetPlayerCountsRequest\"\xb8\x01\n" +
 	"\x17GetPlayerCountsResponse\x128\n" +
 	"\x06titles\x18\x01 \x03(\v2 .openpak.account.v1.TitlePlayersR\x06titles\x12#\n" +
-	"\rtotal_players\x18\x02 \x01(\x05R\ftotalPlayers\"a\n" +
+	"\rtotal_players\x18\x02 \x01(\x05R\ftotalPlayers\x12>\n" +
+	"\bnetworks\x18\x03 \x03(\v2\".openpak.account.v1.NetworkPlayersR\bnetworks\"H\n" +
+	"\x0eNetworkPlayers\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x18\n" +
+	"\aplayers\x18\x02 \x01(\x05R\aplayers\"a\n" +
 	"\fTitlePlayers\x12\x19\n" +
 	"\btitle_id\x18\x01 \x01(\tR\atitleId\x12\x1c\n" +
 	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x12\x18\n" +
@@ -1580,7 +1647,7 @@ func file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP() []byte {
 	return file_openpak_account_v1_sessions_invitations_proto_rawDescData
 }
 
-var file_openpak_account_v1_sessions_invitations_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_openpak_account_v1_sessions_invitations_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_openpak_account_v1_sessions_invitations_proto_goTypes = []any{
 	(*RegisterSessionRequest)(nil),   // 0: openpak.account.v1.RegisterSessionRequest
 	(*RegisterSessionResponse)(nil),  // 1: openpak.account.v1.RegisterSessionResponse
@@ -1607,40 +1674,42 @@ var file_openpak_account_v1_sessions_invitations_proto_goTypes = []any{
 	(*RejectInvitationResponse)(nil), // 22: openpak.account.v1.RejectInvitationResponse
 	(*GetPlayerCountsRequest)(nil),   // 23: openpak.account.v1.GetPlayerCountsRequest
 	(*GetPlayerCountsResponse)(nil),  // 24: openpak.account.v1.GetPlayerCountsResponse
-	(*TitlePlayers)(nil),             // 25: openpak.account.v1.TitlePlayers
+	(*NetworkPlayers)(nil),           // 25: openpak.account.v1.NetworkPlayers
+	(*TitlePlayers)(nil),             // 26: openpak.account.v1.TitlePlayers
 }
 var file_openpak_account_v1_sessions_invitations_proto_depIdxs = []int32{
 	14, // 0: openpak.account.v1.PollInvitationsResponse.invitations:type_name -> openpak.account.v1.Invitation
 	17, // 1: openpak.account.v1.GetPresenceResponse.presence:type_name -> openpak.account.v1.Presence
 	20, // 2: openpak.account.v1.ListInvitationsResponse.invitations:type_name -> openpak.account.v1.InvitationSummary
-	25, // 3: openpak.account.v1.GetPlayerCountsResponse.titles:type_name -> openpak.account.v1.TitlePlayers
-	0,  // 4: openpak.account.v1.Sessions.RegisterSession:input_type -> openpak.account.v1.RegisterSessionRequest
-	2,  // 5: openpak.account.v1.Sessions.Heartbeat:input_type -> openpak.account.v1.HeartbeatRequest
-	4,  // 6: openpak.account.v1.Sessions.ExpireSession:input_type -> openpak.account.v1.ExpireSessionRequest
-	6,  // 7: openpak.account.v1.Sessions.ResolveSession:input_type -> openpak.account.v1.ResolveSessionRequest
-	15, // 8: openpak.account.v1.Sessions.GetPresence:input_type -> openpak.account.v1.GetPresenceRequest
-	23, // 9: openpak.account.v1.Sessions.GetPlayerCounts:input_type -> openpak.account.v1.GetPlayerCountsRequest
-	8,  // 10: openpak.account.v1.Invitations.SendInvitation:input_type -> openpak.account.v1.SendInvitationRequest
-	10, // 11: openpak.account.v1.Invitations.PollInvitations:input_type -> openpak.account.v1.PollInvitationsRequest
-	12, // 12: openpak.account.v1.Invitations.AckInvitations:input_type -> openpak.account.v1.AckInvitationsRequest
-	18, // 13: openpak.account.v1.Invitations.ListInvitations:input_type -> openpak.account.v1.ListInvitationsRequest
-	21, // 14: openpak.account.v1.Invitations.RejectInvitation:input_type -> openpak.account.v1.RejectInvitationRequest
-	1,  // 15: openpak.account.v1.Sessions.RegisterSession:output_type -> openpak.account.v1.RegisterSessionResponse
-	3,  // 16: openpak.account.v1.Sessions.Heartbeat:output_type -> openpak.account.v1.HeartbeatResponse
-	5,  // 17: openpak.account.v1.Sessions.ExpireSession:output_type -> openpak.account.v1.ExpireSessionResponse
-	7,  // 18: openpak.account.v1.Sessions.ResolveSession:output_type -> openpak.account.v1.ResolveSessionResponse
-	16, // 19: openpak.account.v1.Sessions.GetPresence:output_type -> openpak.account.v1.GetPresenceResponse
-	24, // 20: openpak.account.v1.Sessions.GetPlayerCounts:output_type -> openpak.account.v1.GetPlayerCountsResponse
-	9,  // 21: openpak.account.v1.Invitations.SendInvitation:output_type -> openpak.account.v1.SendInvitationResponse
-	11, // 22: openpak.account.v1.Invitations.PollInvitations:output_type -> openpak.account.v1.PollInvitationsResponse
-	13, // 23: openpak.account.v1.Invitations.AckInvitations:output_type -> openpak.account.v1.AckInvitationsResponse
-	19, // 24: openpak.account.v1.Invitations.ListInvitations:output_type -> openpak.account.v1.ListInvitationsResponse
-	22, // 25: openpak.account.v1.Invitations.RejectInvitation:output_type -> openpak.account.v1.RejectInvitationResponse
-	15, // [15:26] is the sub-list for method output_type
-	4,  // [4:15] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	26, // 3: openpak.account.v1.GetPlayerCountsResponse.titles:type_name -> openpak.account.v1.TitlePlayers
+	25, // 4: openpak.account.v1.GetPlayerCountsResponse.networks:type_name -> openpak.account.v1.NetworkPlayers
+	0,  // 5: openpak.account.v1.Sessions.RegisterSession:input_type -> openpak.account.v1.RegisterSessionRequest
+	2,  // 6: openpak.account.v1.Sessions.Heartbeat:input_type -> openpak.account.v1.HeartbeatRequest
+	4,  // 7: openpak.account.v1.Sessions.ExpireSession:input_type -> openpak.account.v1.ExpireSessionRequest
+	6,  // 8: openpak.account.v1.Sessions.ResolveSession:input_type -> openpak.account.v1.ResolveSessionRequest
+	15, // 9: openpak.account.v1.Sessions.GetPresence:input_type -> openpak.account.v1.GetPresenceRequest
+	23, // 10: openpak.account.v1.Sessions.GetPlayerCounts:input_type -> openpak.account.v1.GetPlayerCountsRequest
+	8,  // 11: openpak.account.v1.Invitations.SendInvitation:input_type -> openpak.account.v1.SendInvitationRequest
+	10, // 12: openpak.account.v1.Invitations.PollInvitations:input_type -> openpak.account.v1.PollInvitationsRequest
+	12, // 13: openpak.account.v1.Invitations.AckInvitations:input_type -> openpak.account.v1.AckInvitationsRequest
+	18, // 14: openpak.account.v1.Invitations.ListInvitations:input_type -> openpak.account.v1.ListInvitationsRequest
+	21, // 15: openpak.account.v1.Invitations.RejectInvitation:input_type -> openpak.account.v1.RejectInvitationRequest
+	1,  // 16: openpak.account.v1.Sessions.RegisterSession:output_type -> openpak.account.v1.RegisterSessionResponse
+	3,  // 17: openpak.account.v1.Sessions.Heartbeat:output_type -> openpak.account.v1.HeartbeatResponse
+	5,  // 18: openpak.account.v1.Sessions.ExpireSession:output_type -> openpak.account.v1.ExpireSessionResponse
+	7,  // 19: openpak.account.v1.Sessions.ResolveSession:output_type -> openpak.account.v1.ResolveSessionResponse
+	16, // 20: openpak.account.v1.Sessions.GetPresence:output_type -> openpak.account.v1.GetPresenceResponse
+	24, // 21: openpak.account.v1.Sessions.GetPlayerCounts:output_type -> openpak.account.v1.GetPlayerCountsResponse
+	9,  // 22: openpak.account.v1.Invitations.SendInvitation:output_type -> openpak.account.v1.SendInvitationResponse
+	11, // 23: openpak.account.v1.Invitations.PollInvitations:output_type -> openpak.account.v1.PollInvitationsResponse
+	13, // 24: openpak.account.v1.Invitations.AckInvitations:output_type -> openpak.account.v1.AckInvitationsResponse
+	19, // 25: openpak.account.v1.Invitations.ListInvitations:output_type -> openpak.account.v1.ListInvitationsResponse
+	22, // 26: openpak.account.v1.Invitations.RejectInvitation:output_type -> openpak.account.v1.RejectInvitationResponse
+	16, // [16:27] is the sub-list for method output_type
+	5,  // [5:16] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_openpak_account_v1_sessions_invitations_proto_init() }
@@ -1654,7 +1723,7 @@ func file_openpak_account_v1_sessions_invitations_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_openpak_account_v1_sessions_invitations_proto_rawDesc), len(file_openpak_account_v1_sessions_invitations_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

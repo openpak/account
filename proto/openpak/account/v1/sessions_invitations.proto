@@ -177,6 +177,15 @@ message GetPlayerCountsRequest {}
 message GetPlayerCountsResponse {
   repeated TitlePlayers titles = 1;
   int32 total_players = 2; // distinct accounts, not the sum of the rows
+  // Per adapter namespace: one entry per console network with anybody on it.
+  // Also distinct accounts, so someone playing two titles on the same network
+  // is one player there.
+  repeated NetworkPlayers networks = 3;
+}
+
+message NetworkPlayers {
+  string namespace = 1;
+  int32 players = 2;
 }
 
 message TitlePlayers {
