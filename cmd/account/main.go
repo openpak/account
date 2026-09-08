@@ -72,9 +72,9 @@ func run() error {
 	evSvc := events.New(pool)
 	ident := identity.New(pool, cfg.SessionSecret, sessionTTL, evSvc)
 	lnks := links.New(pool, evSvc)
-	socSvc := social.New(pool)
+	socSvc := social.New(pool, evSvc)
 	sessSvc := sessions.New(pool)
-	invSvc := invitations.New(pool, socSvc, sessionRefResolver{sessSvc})
+	invSvc := invitations.New(pool, socSvc, sessionRefResolver{sessSvc}, evSvc)
 
 	// Outbound email. Production REQUIRES SMTP configuration: registration
 	// and recovery are undeliverable without it (review follow-up P1 #1).

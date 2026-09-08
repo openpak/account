@@ -197,7 +197,7 @@ func TestFollowupMigrationDedupesFriendships(t *testing.T) {
 	// P2 follow-up: the dedupe stamps removed rows with updated_at=now();
 	// GetRelationship must not let that removed row shadow the surviving
 	// accepted relationship (newest-row sort would return it otherwise).
-	soc := social.New(pool)
+	soc := social.New(pool, nil)
 	rel, err := soc.GetRelationship(ctx, aID, bID)
 	if err != nil {
 		t.Fatal(err)

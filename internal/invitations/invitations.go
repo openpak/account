@@ -62,10 +62,17 @@ type Service struct {
 	pool    *pgxpool.Pool
 	check   Checker
 	resolve Resolver
+	emitter Emitter
 }
 
-func New(pool *pgxpool.Pool, check Checker, resolve Resolver) *Service {
-	return &Service{pool: pool, check: check, resolve: resolve}
+// Emitter is the events stream; an invitation that commits is an invitation a
+// companion app may be told about.
+type Emitter interface {
+	EmitTx(ctx context.Context, tx pgx.Tx, typ, accountID, namespace, subjectID string) error
+}
+
+func New(pool *pgxpool.Pool, check Checker, resolve Resolver, emitter Emitter) *Service {
+	return &Service{pool: pool, check: check, resolve: resolve, emitter: emitter}
 }
 
 // Send validates eligibility, requires a live session for the target, and
@@ -102,7 +109,15 @@ func (s *Service) Send(ctx context.Context, fromID, toID, titleID string, payloa
 		TitleID:       titleID,
 		Payload:       payload,
 	}
-	err = s.pool.QueryRow(ctx, `INSERT INTO invitations
+	// The insert and its event share a transaction: a notification is never
+	// promised for an invitation that did not commit, and never lost for one
+	// that did.
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	err = tx.QueryRow(ctx, `INSERT INTO invitations
 			(id, from_id, to_id, namespace, title_id, session_id, payload, nonce, expires_at)
 		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, gen_random_uuid(), now() + make_interval(secs => $7))
 		RETURNING id, nonce::text, extract(epoch FROM expires_at)::bigint`,
@@ -110,6 +125,15 @@ func (s *Service) Send(ctx context.Context, fromID, toID, titleID string, payloa
 		Scan(&in.ID, &in.Nonce, &in.ExpiresAtUnix)
 	if err != nil {
 		return nil, fmt.Errorf("invitations: send: %w", err)
+	}
+	// The recipient is who needs to hear about it; the invitation is the subject.
+	if s.emitter != nil {
+		if err := s.emitter.EmitTx(ctx, tx, "invitation_sent", toID, sess.Namespace, in.ID); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
 	}
 	return in, nil
 }

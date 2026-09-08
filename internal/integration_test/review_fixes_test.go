@@ -43,7 +43,7 @@ func newEnvAll(t *testing.T) (*identity.Service, *links.Service, *events.Service
 	}
 	evSvc := events.New(pool)
 	return identity.New(pool, "test-pepper-0123456789abcdef0123456789abcdef", time.Hour, evSvc),
-		links.New(pool, evSvc), evSvc, social.New(pool), sessions.New(pool)
+		links.New(pool, evSvc), evSvc, social.New(pool, evSvc), sessions.New(pool)
 }
 
 // --- P0 #1 + P1 #6: web flows never leak tokens; emails actually send ---

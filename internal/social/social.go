@@ -53,9 +53,21 @@ const (
 	RelBlockedByOther
 )
 
-type Service struct{ pool *pgxpool.Pool }
+// Emitter is the events stream, so a friend request can wake a companion app.
+// Emitting inside the request's own transaction means a notification is never
+// promised for a request that failed to commit.
+type Emitter interface {
+	EmitTx(ctx context.Context, tx pgx.Tx, typ, accountID, namespace, subjectID string) error
+}
 
-func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+type Service struct {
+	pool    *pgxpool.Pool
+	emitter Emitter
+}
+
+func New(pool *pgxpool.Pool, emitter Emitter) *Service {
+	return &Service{pool: pool, emitter: emitter}
+}
 
 // RequestFriend creates a pending friendship request. Idempotent while
 // pending or accepted for the same pair and direction.
@@ -121,6 +133,14 @@ func (s *Service) RequestFriend(ctx context.Context, requesterID, addresseeID, i
 	}
 	if tag.RowsAffected() != 1 {
 		return nil, ErrNotPending // a removed row could not be re-opened
+	}
+	// The addressee is who needs to hear about this, so they are the event's
+	// account; the requester is its subject. Every path that returns earlier is
+	// idempotent, so asking twice cannot notify twice.
+	if s.emitter != nil {
+		if err := s.emitter.EmitTx(ctx, tx, "friend_requested", addresseeID, "", requesterID); err != nil {
+			return nil, err
+		}
 	}
 	return f, tx.Commit(ctx)
 }

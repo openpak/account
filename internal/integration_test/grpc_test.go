@@ -28,7 +28,7 @@ import (
 
 const grpcInternalKey = "test-internal-key-0123456789abcdef0123456789"
 
-func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, accountv1.SocialClient, accountv1.SessionsClient, accountv1.InvitationsClient, *identity.Service) {
+func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, accountv1.SocialClient, accountv1.SessionsClient, accountv1.InvitationsClient, accountv1.EventsClient, *identity.Service) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -46,9 +46,9 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, a
 	evSvc := events.New(pool)
 	ident := identity.New(pool, "test-pepper-0123456789abcdef0123456789abcdef", time.Hour, evSvc)
 	lnks := links.New(pool, evSvc)
-	soc := social.New(pool)
+	soc := social.New(pool, evSvc)
 	sessSvc := sessions.New(pool)
-	invSvc := invitations.New(pool, soc, testResolver{sessSvc})
+	invSvc := invitations.New(pool, soc, testResolver{sessSvc}, evSvc)
 
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(grpcInternalKey)))
@@ -73,7 +73,7 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, a
 	t.Cleanup(func() { _ = conn.Close() })
 	return accountv1.NewIdentityClient(conn), accountv1.NewLinksClient(conn),
 		accountv1.NewSocialClient(conn), accountv1.NewSessionsClient(conn),
-		accountv1.NewInvitationsClient(conn), ident
+		accountv1.NewInvitationsClient(conn), accountv1.NewEventsClient(conn), ident
 }
 
 // testResolver adapts sessions.Service to invitations.Resolver (mirrors
@@ -89,7 +89,7 @@ func (r testResolver) Resolve(ctx context.Context, accountID, titleID string) (*
 }
 
 func TestGRPCAuthRequired(t *testing.T) {
-	idc, lc, _, _, _, _ := startGRPC(t)
+	idc, lc, _, _, _, _, _ := startGRPC(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	// No credentials → unauthenticated on every method.
@@ -107,7 +107,7 @@ func TestGRPCAuthRequired(t *testing.T) {
 }
 
 func TestGRPCLinkContract(t *testing.T) {
-	idc, lc, _, _, _, ident := startGRPC(t)
+	idc, lc, _, _, _, _, ident := startGRPC(t)
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", grpcInternalKey)
 
 	acct, _, err := ident.Register(ctx, "grpc@example.com", "correct horse battery", "G")
@@ -144,7 +144,7 @@ func TestGRPCLinkContract(t *testing.T) {
 }
 
 func TestGRPCGetActiveLinkByAccount(t *testing.T) {
-	_, lc, _, _, _, ident := startGRPC(t)
+	_, lc, _, _, _, _, ident := startGRPC(t)
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", grpcInternalKey)
 
 	acct, _, err := ident.Register(ctx, "active-link@example.com", "correct horse battery", "A")

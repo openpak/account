@@ -32,7 +32,7 @@ func pair(t *testing.T, ident interface {
 }
 
 func TestSocialFriendLifecycle(t *testing.T) {
-	_, _, soc, _, _, ident := startGRPC(t)
+	_, _, soc, _, _, _, ident := startGRPC(t)
 	ctx := authCtx()
 
 	a, _, err := ident.Register(ctx, "friend-a@example.com", "correct horse battery", "Alice")
@@ -104,7 +104,7 @@ func TestSocialFriendLifecycle(t *testing.T) {
 }
 
 func TestSocialBlockEnforcement(t *testing.T) {
-	_, _, soc, _, inv, ident := startGRPC(t)
+	_, _, soc, _, inv, _, ident := startGRPC(t)
 	ctx := authCtx()
 
 	a, _, err := ident.Register(ctx, "block-a@example.com", "correct horse battery", "A")
@@ -156,7 +156,7 @@ func TestSocialBlockEnforcement(t *testing.T) {
 }
 
 func TestSessionRegistry(t *testing.T) {
-	_, _, _, sess, _, ident := startGRPC(t)
+	_, _, _, sess, _, _, ident := startGRPC(t)
 	ctx := authCtx()
 
 	a, _, err := ident.Register(ctx, "sess-a@example.com", "correct horse battery", "S")
@@ -205,7 +205,7 @@ func TestSessionRegistry(t *testing.T) {
 }
 
 func TestInvitationBlockedAfterQueue(t *testing.T) {
-	_, _, soc, sess, inv, ident := startGRPC(t)
+	_, _, soc, sess, inv, _, ident := startGRPC(t)
 	ctx := authCtx()
 
 	a, _, err := ident.Register(ctx, "qb-a@example.com", "correct horse battery", "QA")
@@ -262,7 +262,7 @@ func TestInvitationBlockedAfterQueue(t *testing.T) {
 }
 
 func TestInvitationSessionLoss(t *testing.T) {
-	_, _, soc, sess, inv, ident := startGRPC(t)
+	_, _, soc, sess, inv, _, ident := startGRPC(t)
 	ctx := authCtx()
 
 	a, _, err := ident.Register(ctx, "sl-a@example.com", "correct horse battery", "SA")
@@ -303,7 +303,7 @@ func TestInvitationSessionLoss(t *testing.T) {
 }
 
 func TestSessionRegistrationConcurrency(t *testing.T) {
-	_, _, _, sess, _, ident := startGRPC(t)
+	_, _, _, sess, _, _, ident := startGRPC(t)
 	ctx := authCtx()
 
 	a, _, err := ident.Register(ctx, "conc-a@example.com", "correct horse battery", "C")
@@ -337,7 +337,7 @@ func TestSessionRegistrationConcurrency(t *testing.T) {
 }
 
 func TestInvitationFlow(t *testing.T) {
-	_, _, soc, sess, inv, ident := startGRPC(t)
+	_, _, soc, sess, inv, _, ident := startGRPC(t)
 	ctx := authCtx()
 
 	a, _, err := ident.Register(ctx, "inv-a@example.com", "correct horse battery", "Host")
@@ -458,9 +458,9 @@ func TestInvitationPollSingleConnection(t *testing.T) {
 		t.Fatalf("connect: %v", err)
 	}
 	t.Cleanup(pool.Close)
-	soc := social.New(pool)
+	soc := social.New(pool, nil)
 	sess := sessions.New(pool)
-	inv := invitations.New(pool, soc, singleConnResolver{sess})
+	inv := invitations.New(pool, soc, singleConnResolver{sess}, nil)
 
 	var aID, bID string
 	if err := pool.QueryRow(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name)
@@ -507,7 +507,7 @@ func (r singleConnResolver) Resolve(ctx context.Context, accountID, titleID stri
 // that a phone can read without stealing the invitation from the adapter whose
 // job is to deliver it.
 func TestCompanionPresenceAndInbox(t *testing.T) {
-	_, _, soc, sess, inv, ident := startGRPC(t)
+	_, _, soc, sess, inv, _, ident := startGRPC(t)
 	ctx := authCtx()
 
 	host, _, err := ident.Register(ctx, "phone-host@example.com", "correct horse battery", "Host")
@@ -599,4 +599,79 @@ func TestCompanionPresenceAndInbox(t *testing.T) {
 		AccountId: guest.ID, InvitationId: sent.GetInvitationId()}); err != nil || got.GetRejected() {
 		t.Fatalf("second decline: %+v %v", got, err)
 	}
+}
+
+// Push hangs off the events stream, so the two things worth a notification have
+// to appear there: a friend request, and an invitation. Both are emitted inside
+// the transaction that creates them, so nothing is announced that did not
+// commit — and asking twice must not notify twice.
+func TestFriendRequestAndInvitationEmitEvents(t *testing.T) {
+	_, _, soc, sess, inv, ev, ident := startGRPC(t)
+	ctx := authCtx()
+
+	from, _, err := ident.Register(ctx, "ev-from@example.com", "correct horse battery", "Sender")
+	if err != nil {
+		t.Fatal(err)
+	}
+	to, _, err := ident.Register(ctx, "ev-to@example.com", "correct horse battery", "Receiver")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const title = "0100E65002BB8000"
+
+	since := latestEventVersion(t, ev)
+
+	if _, err := soc.RequestFriend(ctx, &accountv1.RequestFriendRequest{RequesterId: from.ID, AddresseeId: to.ID}); err != nil {
+		t.Fatal(err)
+	}
+	got := eventsSince(t, ev, since)
+	if len(got) != 1 || got[0].GetType() != "friend_requested" ||
+		got[0].GetAccountId() != to.ID || got[0].GetSubjectId() != from.ID {
+		t.Fatalf("friend request event: %+v", got)
+	}
+
+	// The idempotent repeat must not produce a second notification.
+	if _, err := soc.RequestFriend(ctx, &accountv1.RequestFriendRequest{RequesterId: from.ID, AddresseeId: to.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if got := eventsSince(t, ev, since); len(got) != 1 {
+		t.Fatalf("a repeated request notified twice: %+v", got)
+	}
+
+	if _, err := soc.AcceptFriend(ctx, &accountv1.AcceptFriendRequest{AddresseeId: to.ID, RequesterId: from.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sess.RegisterSession(ctx, &accountv1.RegisterSessionRequest{
+		AccountId: to.ID, Namespace: "switch", TitleId: title, EndpointRef: "ep"}); err != nil {
+		t.Fatal(err)
+	}
+	since = latestEventVersion(t, ev)
+	sent, err := inv.SendInvitation(ctx, &accountv1.SendInvitationRequest{
+		FromAccountId: from.ID, ToAccountId: to.ID, TitleId: title, Payload: []byte("join"), TtlSeconds: 60})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = eventsSince(t, ev, since)
+	if len(got) != 1 || got[0].GetType() != "invitation_sent" ||
+		got[0].GetAccountId() != to.ID || got[0].GetSubjectId() != sent.GetInvitationId() {
+		t.Fatalf("invitation event: %+v", got)
+	}
+}
+
+func latestEventVersion(t *testing.T, ev accountv1.EventsClient) uint64 {
+	t.Helper()
+	resp, err := ev.PollEvents(authCtx(), &accountv1.PollEventsRequest{SinceVersion: 0, Limit: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.GetMaxVersion()
+}
+
+func eventsSince(t *testing.T, ev accountv1.EventsClient, since uint64) []*accountv1.InvalidationEvent {
+	t.Helper()
+	resp, err := ev.PollEvents(authCtx(), &accountv1.PollEventsRequest{SinceVersion: since, Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.GetEvents()
 }
