@@ -256,9 +256,14 @@ func (s *Service) VerifyCredentials(ctx context.Context, email, password string)
 func (s *Service) GetByID(ctx context.Context, id string) (*Account, error) {
 	var a Account
 	var verifiedAt *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT id, display_name, status, email_verified_at, created_at
+	// country and birthday included: every consumer of this call -- the site,
+	// the phone app, the Switch adapter -- showed them empty because they were
+	// not selected here, and a console user object with country "" is not one
+	// a console will take.
+	err := s.pool.QueryRow(ctx, `SELECT id, display_name, status, email_verified_at, created_at,
+		COALESCE(country, ''), COALESCE(birthday::text, '')
 		FROM accounts WHERE id = $1 AND status <> 'deleted'`, id).
-		Scan(&a.ID, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt)
+		Scan(&a.ID, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

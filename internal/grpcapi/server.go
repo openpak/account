@@ -151,6 +151,8 @@ func (s *Server) GetAccount(ctx context.Context, req *accountv1.GetAccountReques
 		Status:        protoStatus(a.Status),
 		EmailVerified: a.EmailVerified,
 		DisplayName:   a.DisplayName,
+		Country:       a.Country,
+		Birthday:      a.Birthday,
 	}, nil
 }
 

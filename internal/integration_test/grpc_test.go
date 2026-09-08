@@ -176,3 +176,28 @@ func TestGRPCGetActiveLinkByAccount(t *testing.T) {
 		t.Fatalf("expected NotFound in other namespace, got %v", err)
 	}
 }
+
+// GetAccount returned the account without its country or birthday: the fields
+// existed in the proto, the column existed in the table, and the query in
+// between selected neither. Everything downstream showed them empty — the
+// site, the phone app, and the Switch adapter, whose user objects went to a
+// console saying country "".
+func TestGRPCGetAccountCarriesCountryAndBirthday(t *testing.T) {
+	idc, _, _, _, _, _, ident := startGRPC(t)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", grpcInternalKey)
+
+	acct, _, err := ident.RegisterWithProfile(ctx, "profile@example.com", "correct horse battery", "P", identity.Profile{Country: "IE", Birthday: "1990-01-02"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := idc.GetAccount(ctx, &accountv1.GetAccountRequest{AccountId: acct.ID})
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.GetCountry() != "IE" {
+		t.Errorf("country = %q, want IE", got.GetCountry())
+	}
+	if got.GetBirthday() != "1990-01-02" {
+		t.Errorf("birthday = %q, want 1990-01-02", got.GetBirthday())
+	}
+}
