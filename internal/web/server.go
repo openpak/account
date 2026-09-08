@@ -41,6 +41,7 @@ func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string)
 	s.mux.HandleFunc("GET /v1/sessions", s.auth(s.handleListSessions))
 	s.mux.HandleFunc("DELETE /v1/sessions/{id}", s.auth(s.handleRevokeSession))
 	s.mux.HandleFunc("POST /v1/change-password", s.auth(s.handleChangePassword))
+	s.mux.HandleFunc("POST /v1/profile", s.auth(s.handleUpdateProfile))
 	s.mux.HandleFunc("POST /v1/forgot-password", s.handleForgotPassword)
 	s.mux.HandleFunc("POST /v1/reset-password", s.handleResetPassword)
 	s.mux.HandleFunc("GET /v1/reset-password", s.handleResetPasswordPage)
@@ -349,6 +350,25 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, ac
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"message": "password changed"})
+}
+
+// handleUpdateProfile fills in the country and date of birth of an account that predates
+// registration collecting them. Both are optional: an account may legitimately hold neither,
+// and nothing downstream invents a value for what is missing.
+func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
+	var req struct {
+		Country  string `json:"country"`
+		Birthday string `json:"birthday"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	updated, err := s.identity.UpdateProfile(r.Context(), acct.ID, identity.Profile{Country: req.Country, Birthday: req.Birthday})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"country": updated.Country, "birthday": updated.Birthday})
 }
 
 // adapterProxy forwards the console-link page to the Switch adapter under this service's own

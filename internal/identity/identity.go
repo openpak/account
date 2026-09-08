@@ -163,6 +163,29 @@ func (s *Service) RegisterWithProfile(ctx context.Context, email, password, disp
 		Country: p.Country, Birthday: p.Birthday, Status: StatusActive}, token, nil
 }
 
+// UpdateProfile sets the country and birthday of an existing account. Registration collects
+// both, but every account created before it did has neither, and the console's user object
+// carries whatever the account holds — so there has to be a way to fill them in later.
+func (s *Service) UpdateProfile(ctx context.Context, accountID string, p Profile) (*Account, error) {
+	if err := validateProfile(&p); err != nil {
+		return nil, err
+	}
+	var birthday any
+	if p.Birthday != "" {
+		birthday = p.Birthday
+	}
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE accounts SET country = $2, birthday = $3, updated_at = now() WHERE id = $1`,
+		accountID, p.Country, birthday)
+	if err != nil {
+		return nil, fmt.Errorf("identity: update profile: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, ErrNotFound
+	}
+	return s.GetByID(ctx, accountID)
+}
+
 // VerifyEmail consumes a single-use verification token.
 func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 	return s.consumeToken(ctx, token, "email_verify", func(ctx context.Context, accountID string) error {
