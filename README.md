@@ -28,7 +28,24 @@ Requires PostgreSQL. Migrations apply automatically at startup.
 - `internal/architecture` — guard test: no Nintendo imports in the core
 - `migrations` — versioned SQL migrations (embedded)
 
+## Contracts added for the phone and the status page (2026-09-08)
+
+| RPC | Why it could not reuse what existed |
+| --- | --- |
+| `Sessions.GetPresence` | who is online and in which title, from the live session leases — so a friends list and a status page can never disagree |
+| `Sessions.GetPlayerCounts` | players per title and per network. Counts **accounts, not sessions**: someone with a console and an emulator open is one person, so the total is its own query rather than a sum |
+| `Invitations.ListInvitations` | `PollInvitations` is namespace-scoped, starts a redelivery window and is consumed by `AckInvitations` — a phone calling it would take an invitation away from the console that has to receive it. This one consumes nothing and carries neither payload nor nonce |
+| `Invitations.RejectInvitation` | the decline button, scoped to the recipient |
+| `POST /v1/profile` | country, birthday and display name were settable at sign-up and never afterwards |
+
+Two events were added because push had nothing to hang on: `friend_requested` and
+`invitation_sent`, both emitted **inside the transaction that creates the thing** — a
+notification is never promised for something that did not commit. `invalidation_events.type` is
+a closed set, so migration `0009` had to admit them; that constraint did its job and is worth
+keeping closed.
+
 ## Tests
+
 
 ```sh
 docker run -d --name openpak-pg-test -e POSTGRES_PASSWORD=test \
