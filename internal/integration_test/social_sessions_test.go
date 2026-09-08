@@ -502,3 +502,101 @@ func (r singleConnResolver) Resolve(ctx context.Context, accountID, titleID stri
 	}
 	return &invitations.SessionRef{ID: sess.ID, Namespace: sess.Namespace}, nil
 }
+
+// The companion surfaces: presence for a friends list, and an invitation inbox
+// that a phone can read without stealing the invitation from the adapter whose
+// job is to deliver it.
+func TestCompanionPresenceAndInbox(t *testing.T) {
+	_, _, soc, sess, inv, ident := startGRPC(t)
+	ctx := authCtx()
+
+	host, _, err := ident.Register(ctx, "phone-host@example.com", "correct horse battery", "Host")
+	if err != nil {
+		t.Fatal(err)
+	}
+	guest, _, err := ident.Register(ctx, "phone-guest@example.com", "correct horse battery", "Guest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	offline, _, err := ident.Register(ctx, "phone-offline@example.com", "correct horse battery", "Absent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const title = "0100E65002BB8000"
+
+	// Nobody is playing yet: presence is empty rather than a row of "offline".
+	pres, err := sess.GetPresence(ctx, &accountv1.GetPresenceRequest{AccountIds: []string{host.ID, guest.ID, offline.ID}})
+	if err != nil {
+		t.Fatalf("presence: %v", err)
+	}
+	if len(pres.GetPresence()) != 0 {
+		t.Fatalf("presence before any session: %+v", pres.GetPresence())
+	}
+
+	if _, err := sess.RegisterSession(ctx, &accountv1.RegisterSessionRequest{
+		AccountId: guest.ID, Namespace: "switch", TitleId: title, EndpointRef: "ep-guest"}); err != nil {
+		t.Fatal(err)
+	}
+	pres, err = sess.GetPresence(ctx, &accountv1.GetPresenceRequest{AccountIds: []string{host.ID, guest.ID, offline.ID}})
+	if err != nil {
+		t.Fatalf("presence: %v", err)
+	}
+	if len(pres.GetPresence()) != 1 {
+		t.Fatalf("want only the account with a live session, got %+v", pres.GetPresence())
+	}
+	if p := pres.GetPresence()[0]; p.GetAccountId() != guest.ID || p.GetTitleId() != title ||
+		p.GetNamespace() != "switch" || p.GetSinceUnix() == 0 {
+		t.Fatalf("presence row: %+v", p)
+	}
+
+	// An invitation the guest can see on a phone.
+	if _, err := soc.RequestFriend(ctx, &accountv1.RequestFriendRequest{RequesterId: host.ID, AddresseeId: guest.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := soc.AcceptFriend(ctx, &accountv1.AcceptFriendRequest{AddresseeId: guest.ID, RequesterId: host.ID}); err != nil {
+		t.Fatal(err)
+	}
+	sent, err := inv.SendInvitation(ctx, &accountv1.SendInvitationRequest{
+		FromAccountId: host.ID, ToAccountId: guest.ID, TitleId: title, Payload: []byte("join-me"), TtlSeconds: 120})
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	list, err := inv.ListInvitations(ctx, &accountv1.ListInvitationsRequest{AccountId: guest.ID})
+	if err != nil || len(list.GetInvitations()) != 1 {
+		t.Fatalf("inbox: %+v %v", list.GetInvitations(), err)
+	}
+	if got := list.GetInvitations()[0]; got.GetInvitationId() != sent.GetInvitationId() ||
+		got.GetFromDisplayName() != "Host" || got.GetTitleId() != title || got.GetNamespace() != "switch" {
+		t.Fatalf("inbox entry: %+v", got)
+	}
+
+	// Reading the inbox twice must not consume anything, and the adapter must
+	// still receive the invitation afterwards: this is the whole point of a
+	// separate read path.
+	if list, err := inv.ListInvitations(ctx, &accountv1.ListInvitationsRequest{AccountId: guest.ID}); err != nil || len(list.GetInvitations()) != 1 {
+		t.Fatalf("second read consumed it: %+v %v", list.GetInvitations(), err)
+	}
+	polled, err := inv.PollInvitations(ctx, &accountv1.PollInvitationsRequest{Namespace: "switch", AccountId: guest.ID})
+	if err != nil || len(polled.GetInvitations()) != 1 {
+		t.Fatalf("delivery path starved by the inbox read: %+v %v", polled.GetInvitations(), err)
+	}
+
+	// Someone else's invitation is not theirs to decline.
+	if got, err := inv.RejectInvitation(ctx, &accountv1.RejectInvitationRequest{
+		AccountId: host.ID, InvitationId: sent.GetInvitationId()}); err != nil || got.GetRejected() {
+		t.Fatalf("a non-recipient declined it: %+v %v", got, err)
+	}
+	if got, err := inv.RejectInvitation(ctx, &accountv1.RejectInvitationRequest{
+		AccountId: guest.ID, InvitationId: sent.GetInvitationId()}); err != nil || !got.GetRejected() {
+		t.Fatalf("recipient decline: %+v %v", got, err)
+	}
+	// Declined leaves the inbox, and declining twice is not an error.
+	if list, err := inv.ListInvitations(ctx, &accountv1.ListInvitationsRequest{AccountId: guest.ID}); err != nil || len(list.GetInvitations()) != 0 {
+		t.Fatalf("declined invitation still in the inbox: %+v %v", list.GetInvitations(), err)
+	}
+	if got, err := inv.RejectInvitation(ctx, &accountv1.RejectInvitationRequest{
+		AccountId: guest.ID, InvitationId: sent.GetInvitationId()}); err != nil || got.GetRejected() {
+		t.Fatalf("second decline: %+v %v", got, err)
+	}
+}

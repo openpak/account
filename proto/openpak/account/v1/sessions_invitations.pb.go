@@ -865,6 +865,440 @@ func (x *Invitation) GetExpiresAtUnix() int64 {
 	return 0
 }
 
+type GetPresenceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountIds    []string               `protobuf:"bytes,1,rep,name=account_ids,json=accountIds,proto3" json:"account_ids,omitempty"` // capped server-side at 200
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPresenceRequest) Reset() {
+	*x = GetPresenceRequest{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPresenceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPresenceRequest) ProtoMessage() {}
+
+func (x *GetPresenceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPresenceRequest.ProtoReflect.Descriptor instead.
+func (*GetPresenceRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetPresenceRequest) GetAccountIds() []string {
+	if x != nil {
+		return x.AccountIds
+	}
+	return nil
+}
+
+type GetPresenceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Presence      []*Presence            `protobuf:"bytes,1,rep,name=presence,proto3" json:"presence,omitempty"` // only accounts with a live session
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPresenceResponse) Reset() {
+	*x = GetPresenceResponse{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPresenceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPresenceResponse) ProtoMessage() {}
+
+func (x *GetPresenceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPresenceResponse.ProtoReflect.Descriptor instead.
+func (*GetPresenceResponse) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetPresenceResponse) GetPresence() []*Presence {
+	if x != nil {
+		return x.Presence
+	}
+	return nil
+}
+
+type Presence struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Namespace     string                 `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`                   // adapter the session belongs to
+	TitleId       string                 `protobuf:"bytes,3,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`        // what they are playing; empty when the adapter sent none
+	SinceUnix     int64                  `protobuf:"varint,4,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"` // when the session was registered
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Presence) Reset() {
+	*x = Presence{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Presence) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Presence) ProtoMessage() {}
+
+func (x *Presence) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Presence.ProtoReflect.Descriptor instead.
+func (*Presence) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *Presence) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *Presence) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *Presence) GetTitleId() string {
+	if x != nil {
+		return x.TitleId
+	}
+	return ""
+}
+
+func (x *Presence) GetSinceUnix() int64 {
+	if x != nil {
+		return x.SinceUnix
+	}
+	return 0
+}
+
+type ListInvitationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"` // optional; server default and cap 100
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInvitationsRequest) Reset() {
+	*x = ListInvitationsRequest{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInvitationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInvitationsRequest) ProtoMessage() {}
+
+func (x *ListInvitationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInvitationsRequest.ProtoReflect.Descriptor instead.
+func (*ListInvitationsRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListInvitationsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ListInvitationsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListInvitationsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Invitations   []*InvitationSummary   `protobuf:"bytes,1,rep,name=invitations,proto3" json:"invitations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInvitationsResponse) Reset() {
+	*x = ListInvitationsResponse{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInvitationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInvitationsResponse) ProtoMessage() {}
+
+func (x *ListInvitationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInvitationsResponse.ProtoReflect.Descriptor instead.
+func (*ListInvitationsResponse) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListInvitationsResponse) GetInvitations() []*InvitationSummary {
+	if x != nil {
+		return x.Invitations
+	}
+	return nil
+}
+
+// What a person may see about an invitation waiting for them. Deliberately not
+// Invitation: payload and nonce are the delivering adapter's business.
+type InvitationSummary struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	InvitationId    string                 `protobuf:"bytes,1,opt,name=invitation_id,json=invitationId,proto3" json:"invitation_id,omitempty"`
+	FromAccountId   string                 `protobuf:"bytes,2,opt,name=from_account_id,json=fromAccountId,proto3" json:"from_account_id,omitempty"`
+	FromDisplayName string                 `protobuf:"bytes,3,opt,name=from_display_name,json=fromDisplayName,proto3" json:"from_display_name,omitempty"`
+	TitleId         string                 `protobuf:"bytes,4,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
+	Namespace       string                 `protobuf:"bytes,5,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	ExpiresAtUnix   int64                  `protobuf:"varint,6,opt,name=expires_at_unix,json=expiresAtUnix,proto3" json:"expires_at_unix,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *InvitationSummary) Reset() {
+	*x = InvitationSummary{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvitationSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvitationSummary) ProtoMessage() {}
+
+func (x *InvitationSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvitationSummary.ProtoReflect.Descriptor instead.
+func (*InvitationSummary) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *InvitationSummary) GetInvitationId() string {
+	if x != nil {
+		return x.InvitationId
+	}
+	return ""
+}
+
+func (x *InvitationSummary) GetFromAccountId() string {
+	if x != nil {
+		return x.FromAccountId
+	}
+	return ""
+}
+
+func (x *InvitationSummary) GetFromDisplayName() string {
+	if x != nil {
+		return x.FromDisplayName
+	}
+	return ""
+}
+
+func (x *InvitationSummary) GetTitleId() string {
+	if x != nil {
+		return x.TitleId
+	}
+	return ""
+}
+
+func (x *InvitationSummary) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *InvitationSummary) GetExpiresAtUnix() int64 {
+	if x != nil {
+		return x.ExpiresAtUnix
+	}
+	return 0
+}
+
+type RejectInvitationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"` // must be the recipient
+	InvitationId  string                 `protobuf:"bytes,2,opt,name=invitation_id,json=invitationId,proto3" json:"invitation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectInvitationRequest) Reset() {
+	*x = RejectInvitationRequest{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectInvitationRequest) ProtoMessage() {}
+
+func (x *RejectInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectInvitationRequest.ProtoReflect.Descriptor instead.
+func (*RejectInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RejectInvitationRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RejectInvitationRequest) GetInvitationId() string {
+	if x != nil {
+		return x.InvitationId
+	}
+	return ""
+}
+
+type RejectInvitationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Rejected      bool                   `protobuf:"varint,1,opt,name=rejected,proto3" json:"rejected,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectInvitationResponse) Reset() {
+	*x = RejectInvitationResponse{}
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectInvitationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectInvitationResponse) ProtoMessage() {}
+
+func (x *RejectInvitationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_sessions_invitations_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectInvitationResponse.ProtoReflect.Descriptor instead.
+func (*RejectInvitationResponse) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RejectInvitationResponse) GetRejected() bool {
+	if x != nil {
+		return x.Rejected
+	}
+	return false
+}
+
 var File_openpak_account_v1_sessions_invitations_proto protoreflect.FileDescriptor
 
 const file_openpak_account_v1_sessions_invitations_proto_rawDesc = "" +
@@ -932,16 +1366,50 @@ const file_openpak_account_v1_sessions_invitations_proto_rawDesc = "" +
 	"\btitle_id\x18\x04 \x01(\tR\atitleId\x12\x18\n" +
 	"\apayload\x18\x05 \x01(\fR\apayload\x12\x14\n" +
 	"\x05nonce\x18\x06 \x01(\tR\x05nonce\x12&\n" +
-	"\x0fexpires_at_unix\x18\a \x01(\x03R\rexpiresAtUnix2\x9f\x03\n" +
+	"\x0fexpires_at_unix\x18\a \x01(\x03R\rexpiresAtUnix\"5\n" +
+	"\x12GetPresenceRequest\x12\x1f\n" +
+	"\vaccount_ids\x18\x01 \x03(\tR\n" +
+	"accountIds\"O\n" +
+	"\x13GetPresenceResponse\x128\n" +
+	"\bpresence\x18\x01 \x03(\v2\x1c.openpak.account.v1.PresenceR\bpresence\"\x81\x01\n" +
+	"\bPresence\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1c\n" +
+	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x12\x19\n" +
+	"\btitle_id\x18\x03 \x01(\tR\atitleId\x12\x1d\n" +
+	"\n" +
+	"since_unix\x18\x04 \x01(\x03R\tsinceUnix\"M\n" +
+	"\x16ListInvitationsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\"b\n" +
+	"\x17ListInvitationsResponse\x12G\n" +
+	"\vinvitations\x18\x01 \x03(\v2%.openpak.account.v1.InvitationSummaryR\vinvitations\"\xed\x01\n" +
+	"\x11InvitationSummary\x12#\n" +
+	"\rinvitation_id\x18\x01 \x01(\tR\finvitationId\x12&\n" +
+	"\x0ffrom_account_id\x18\x02 \x01(\tR\rfromAccountId\x12*\n" +
+	"\x11from_display_name\x18\x03 \x01(\tR\x0ffromDisplayName\x12\x19\n" +
+	"\btitle_id\x18\x04 \x01(\tR\atitleId\x12\x1c\n" +
+	"\tnamespace\x18\x05 \x01(\tR\tnamespace\x12&\n" +
+	"\x0fexpires_at_unix\x18\x06 \x01(\x03R\rexpiresAtUnix\"]\n" +
+	"\x17RejectInvitationRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12#\n" +
+	"\rinvitation_id\x18\x02 \x01(\tR\finvitationId\"6\n" +
+	"\x18RejectInvitationResponse\x12\x1a\n" +
+	"\brejected\x18\x01 \x01(\bR\brejected2\xff\x03\n" +
 	"\bSessions\x12j\n" +
 	"\x0fRegisterSession\x12*.openpak.account.v1.RegisterSessionRequest\x1a+.openpak.account.v1.RegisterSessionResponse\x12X\n" +
 	"\tHeartbeat\x12$.openpak.account.v1.HeartbeatRequest\x1a%.openpak.account.v1.HeartbeatResponse\x12d\n" +
 	"\rExpireSession\x12(.openpak.account.v1.ExpireSessionRequest\x1a).openpak.account.v1.ExpireSessionResponse\x12g\n" +
-	"\x0eResolveSession\x12).openpak.account.v1.ResolveSessionRequest\x1a*.openpak.account.v1.ResolveSessionResponse2\xcb\x02\n" +
+	"\x0eResolveSession\x12).openpak.account.v1.ResolveSessionRequest\x1a*.openpak.account.v1.ResolveSessionResponse\x12^\n" +
+	"\vGetPresence\x12&.openpak.account.v1.GetPresenceRequest\x1a'.openpak.account.v1.GetPresenceResponse2\xa6\x04\n" +
 	"\vInvitations\x12g\n" +
 	"\x0eSendInvitation\x12).openpak.account.v1.SendInvitationRequest\x1a*.openpak.account.v1.SendInvitationResponse\x12j\n" +
 	"\x0fPollInvitations\x12*.openpak.account.v1.PollInvitationsRequest\x1a+.openpak.account.v1.PollInvitationsResponse\x12g\n" +
-	"\x0eAckInvitations\x12).openpak.account.v1.AckInvitationsRequest\x1a*.openpak.account.v1.AckInvitationsResponseB4Z2openpak/account/proto/openpak/account/v1;accountv1b\x06proto3"
+	"\x0eAckInvitations\x12).openpak.account.v1.AckInvitationsRequest\x1a*.openpak.account.v1.AckInvitationsResponse\x12j\n" +
+	"\x0fListInvitations\x12*.openpak.account.v1.ListInvitationsRequest\x1a+.openpak.account.v1.ListInvitationsResponse\x12m\n" +
+	"\x10RejectInvitation\x12+.openpak.account.v1.RejectInvitationRequest\x1a,.openpak.account.v1.RejectInvitationResponseB4Z2openpak/account/proto/openpak/account/v1;accountv1b\x06proto3"
 
 var (
 	file_openpak_account_v1_sessions_invitations_proto_rawDescOnce sync.Once
@@ -955,45 +1423,61 @@ func file_openpak_account_v1_sessions_invitations_proto_rawDescGZIP() []byte {
 	return file_openpak_account_v1_sessions_invitations_proto_rawDescData
 }
 
-var file_openpak_account_v1_sessions_invitations_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_openpak_account_v1_sessions_invitations_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_openpak_account_v1_sessions_invitations_proto_goTypes = []any{
-	(*RegisterSessionRequest)(nil),  // 0: openpak.account.v1.RegisterSessionRequest
-	(*RegisterSessionResponse)(nil), // 1: openpak.account.v1.RegisterSessionResponse
-	(*HeartbeatRequest)(nil),        // 2: openpak.account.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),       // 3: openpak.account.v1.HeartbeatResponse
-	(*ExpireSessionRequest)(nil),    // 4: openpak.account.v1.ExpireSessionRequest
-	(*ExpireSessionResponse)(nil),   // 5: openpak.account.v1.ExpireSessionResponse
-	(*ResolveSessionRequest)(nil),   // 6: openpak.account.v1.ResolveSessionRequest
-	(*ResolveSessionResponse)(nil),  // 7: openpak.account.v1.ResolveSessionResponse
-	(*SendInvitationRequest)(nil),   // 8: openpak.account.v1.SendInvitationRequest
-	(*SendInvitationResponse)(nil),  // 9: openpak.account.v1.SendInvitationResponse
-	(*PollInvitationsRequest)(nil),  // 10: openpak.account.v1.PollInvitationsRequest
-	(*PollInvitationsResponse)(nil), // 11: openpak.account.v1.PollInvitationsResponse
-	(*AckInvitationsRequest)(nil),   // 12: openpak.account.v1.AckInvitationsRequest
-	(*AckInvitationsResponse)(nil),  // 13: openpak.account.v1.AckInvitationsResponse
-	(*Invitation)(nil),              // 14: openpak.account.v1.Invitation
+	(*RegisterSessionRequest)(nil),   // 0: openpak.account.v1.RegisterSessionRequest
+	(*RegisterSessionResponse)(nil),  // 1: openpak.account.v1.RegisterSessionResponse
+	(*HeartbeatRequest)(nil),         // 2: openpak.account.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),        // 3: openpak.account.v1.HeartbeatResponse
+	(*ExpireSessionRequest)(nil),     // 4: openpak.account.v1.ExpireSessionRequest
+	(*ExpireSessionResponse)(nil),    // 5: openpak.account.v1.ExpireSessionResponse
+	(*ResolveSessionRequest)(nil),    // 6: openpak.account.v1.ResolveSessionRequest
+	(*ResolveSessionResponse)(nil),   // 7: openpak.account.v1.ResolveSessionResponse
+	(*SendInvitationRequest)(nil),    // 8: openpak.account.v1.SendInvitationRequest
+	(*SendInvitationResponse)(nil),   // 9: openpak.account.v1.SendInvitationResponse
+	(*PollInvitationsRequest)(nil),   // 10: openpak.account.v1.PollInvitationsRequest
+	(*PollInvitationsResponse)(nil),  // 11: openpak.account.v1.PollInvitationsResponse
+	(*AckInvitationsRequest)(nil),    // 12: openpak.account.v1.AckInvitationsRequest
+	(*AckInvitationsResponse)(nil),   // 13: openpak.account.v1.AckInvitationsResponse
+	(*Invitation)(nil),               // 14: openpak.account.v1.Invitation
+	(*GetPresenceRequest)(nil),       // 15: openpak.account.v1.GetPresenceRequest
+	(*GetPresenceResponse)(nil),      // 16: openpak.account.v1.GetPresenceResponse
+	(*Presence)(nil),                 // 17: openpak.account.v1.Presence
+	(*ListInvitationsRequest)(nil),   // 18: openpak.account.v1.ListInvitationsRequest
+	(*ListInvitationsResponse)(nil),  // 19: openpak.account.v1.ListInvitationsResponse
+	(*InvitationSummary)(nil),        // 20: openpak.account.v1.InvitationSummary
+	(*RejectInvitationRequest)(nil),  // 21: openpak.account.v1.RejectInvitationRequest
+	(*RejectInvitationResponse)(nil), // 22: openpak.account.v1.RejectInvitationResponse
 }
 var file_openpak_account_v1_sessions_invitations_proto_depIdxs = []int32{
 	14, // 0: openpak.account.v1.PollInvitationsResponse.invitations:type_name -> openpak.account.v1.Invitation
-	0,  // 1: openpak.account.v1.Sessions.RegisterSession:input_type -> openpak.account.v1.RegisterSessionRequest
-	2,  // 2: openpak.account.v1.Sessions.Heartbeat:input_type -> openpak.account.v1.HeartbeatRequest
-	4,  // 3: openpak.account.v1.Sessions.ExpireSession:input_type -> openpak.account.v1.ExpireSessionRequest
-	6,  // 4: openpak.account.v1.Sessions.ResolveSession:input_type -> openpak.account.v1.ResolveSessionRequest
-	8,  // 5: openpak.account.v1.Invitations.SendInvitation:input_type -> openpak.account.v1.SendInvitationRequest
-	10, // 6: openpak.account.v1.Invitations.PollInvitations:input_type -> openpak.account.v1.PollInvitationsRequest
-	12, // 7: openpak.account.v1.Invitations.AckInvitations:input_type -> openpak.account.v1.AckInvitationsRequest
-	1,  // 8: openpak.account.v1.Sessions.RegisterSession:output_type -> openpak.account.v1.RegisterSessionResponse
-	3,  // 9: openpak.account.v1.Sessions.Heartbeat:output_type -> openpak.account.v1.HeartbeatResponse
-	5,  // 10: openpak.account.v1.Sessions.ExpireSession:output_type -> openpak.account.v1.ExpireSessionResponse
-	7,  // 11: openpak.account.v1.Sessions.ResolveSession:output_type -> openpak.account.v1.ResolveSessionResponse
-	9,  // 12: openpak.account.v1.Invitations.SendInvitation:output_type -> openpak.account.v1.SendInvitationResponse
-	11, // 13: openpak.account.v1.Invitations.PollInvitations:output_type -> openpak.account.v1.PollInvitationsResponse
-	13, // 14: openpak.account.v1.Invitations.AckInvitations:output_type -> openpak.account.v1.AckInvitationsResponse
-	8,  // [8:15] is the sub-list for method output_type
-	1,  // [1:8] is the sub-list for method input_type
-	1,  // [1:1] is the sub-list for extension type_name
-	1,  // [1:1] is the sub-list for extension extendee
-	0,  // [0:1] is the sub-list for field type_name
+	17, // 1: openpak.account.v1.GetPresenceResponse.presence:type_name -> openpak.account.v1.Presence
+	20, // 2: openpak.account.v1.ListInvitationsResponse.invitations:type_name -> openpak.account.v1.InvitationSummary
+	0,  // 3: openpak.account.v1.Sessions.RegisterSession:input_type -> openpak.account.v1.RegisterSessionRequest
+	2,  // 4: openpak.account.v1.Sessions.Heartbeat:input_type -> openpak.account.v1.HeartbeatRequest
+	4,  // 5: openpak.account.v1.Sessions.ExpireSession:input_type -> openpak.account.v1.ExpireSessionRequest
+	6,  // 6: openpak.account.v1.Sessions.ResolveSession:input_type -> openpak.account.v1.ResolveSessionRequest
+	15, // 7: openpak.account.v1.Sessions.GetPresence:input_type -> openpak.account.v1.GetPresenceRequest
+	8,  // 8: openpak.account.v1.Invitations.SendInvitation:input_type -> openpak.account.v1.SendInvitationRequest
+	10, // 9: openpak.account.v1.Invitations.PollInvitations:input_type -> openpak.account.v1.PollInvitationsRequest
+	12, // 10: openpak.account.v1.Invitations.AckInvitations:input_type -> openpak.account.v1.AckInvitationsRequest
+	18, // 11: openpak.account.v1.Invitations.ListInvitations:input_type -> openpak.account.v1.ListInvitationsRequest
+	21, // 12: openpak.account.v1.Invitations.RejectInvitation:input_type -> openpak.account.v1.RejectInvitationRequest
+	1,  // 13: openpak.account.v1.Sessions.RegisterSession:output_type -> openpak.account.v1.RegisterSessionResponse
+	3,  // 14: openpak.account.v1.Sessions.Heartbeat:output_type -> openpak.account.v1.HeartbeatResponse
+	5,  // 15: openpak.account.v1.Sessions.ExpireSession:output_type -> openpak.account.v1.ExpireSessionResponse
+	7,  // 16: openpak.account.v1.Sessions.ResolveSession:output_type -> openpak.account.v1.ResolveSessionResponse
+	16, // 17: openpak.account.v1.Sessions.GetPresence:output_type -> openpak.account.v1.GetPresenceResponse
+	9,  // 18: openpak.account.v1.Invitations.SendInvitation:output_type -> openpak.account.v1.SendInvitationResponse
+	11, // 19: openpak.account.v1.Invitations.PollInvitations:output_type -> openpak.account.v1.PollInvitationsResponse
+	13, // 20: openpak.account.v1.Invitations.AckInvitations:output_type -> openpak.account.v1.AckInvitationsResponse
+	19, // 21: openpak.account.v1.Invitations.ListInvitations:output_type -> openpak.account.v1.ListInvitationsResponse
+	22, // 22: openpak.account.v1.Invitations.RejectInvitation:output_type -> openpak.account.v1.RejectInvitationResponse
+	13, // [13:23] is the sub-list for method output_type
+	3,  // [3:13] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_openpak_account_v1_sessions_invitations_proto_init() }
@@ -1007,7 +1491,7 @@ func file_openpak_account_v1_sessions_invitations_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_openpak_account_v1_sessions_invitations_proto_rawDesc), len(file_openpak_account_v1_sessions_invitations_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

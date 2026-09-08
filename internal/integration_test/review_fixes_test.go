@@ -76,10 +76,10 @@ func newWebServer(t *testing.T, ident *identity.Service, m *mailer.Mailer) (*web
 			*rec = append(*rec, to+"|"+subject)
 			return nil
 		})
-		return web.New(ident, m, "https://accounts.test"), rec, &failFlag
+		return web.New(ident, m, "https://accounts.test", "https://openpak.test"), rec, &failFlag
 	}
 	// Caller supplied their own fake; they assert against it directly.
-	return web.New(ident, m, "https://accounts.test"), nil, nil
+	return web.New(ident, m, "https://accounts.test", "https://openpak.test"), nil, nil
 }
 
 func postJSON(t *testing.T, h http.Handler, path, body string) *httptest.ResponseRecorder {

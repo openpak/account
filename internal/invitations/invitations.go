@@ -237,3 +237,68 @@ func (s *Service) Ack(ctx context.Context, namespace, accountID string, ids, non
 // ErrNotFound is returned by Send when callers need to probe session state
 // indirectly; the resolver returns its own sentinel otherwise.
 var ErrNotFound = errors.New("invitations: not found")
+
+// Summary is what the recipient may see about an invitation waiting for them.
+// Payload and nonce are missing on purpose: they belong to the adapter that has
+// to deliver the thing, not to a phone showing an inbox.
+type Summary struct {
+	ID              string
+	FromAccountID   string
+	FromDisplayName string
+	TitleID         string
+	Namespace       string
+	ExpiresAtUnix   int64
+}
+
+// List reads the invitations pending for an account across every namespace
+// WITHOUT consuming them: no redelivery window is started, nothing is marked
+// delivered, no row is locked. Poll is the delivery path and stays the only
+// thing that moves an invitation along; this is a read for a person looking at
+// a screen, and the two must not compete.
+func (s *Service) List(ctx context.Context, accountID string, limit int32) ([]*Summary, error) {
+	if accountID == "" {
+		return nil, ErrInvalid
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 100
+	}
+	// Expiry is applied as a filter rather than a write: a read should not
+	// reap, or two phones refreshing would fight the delivery path for locks.
+	rows, err := s.pool.Query(ctx, `SELECT i.id, i.from_id, acc.display_name, i.title_id,
+			i.namespace, extract(epoch FROM i.expires_at)::bigint
+		FROM invitations i
+		JOIN accounts acc ON acc.id = i.from_id
+		WHERE i.to_id=$1 AND i.state='pending' AND i.expires_at > now()
+		ORDER BY i.created_at DESC LIMIT $2`, accountID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Summary
+	for rows.Next() {
+		in := &Summary{}
+		if err := rows.Scan(&in.ID, &in.FromAccountID, &in.FromDisplayName, &in.TitleID,
+			&in.Namespace, &in.ExpiresAtUnix); err != nil {
+			return nil, err
+		}
+		out = append(out, in)
+	}
+	return out, rows.Err()
+}
+
+// Reject declines an invitation on behalf of the account it was addressed to.
+// Scoped by to_id so one account cannot decline another's invitation, and only
+// while still pending: declining something already delivered or expired changes
+// nothing and says so.
+func (s *Service) Reject(ctx context.Context, accountID, invitationID string) (bool, error) {
+	if accountID == "" || invitationID == "" {
+		return false, ErrInvalid
+	}
+	// No updated_at on this table; state and delivered_at are the whole record.
+	tag, err := s.pool.Exec(ctx, `UPDATE invitations SET state='rejected'
+		WHERE id=$1 AND to_id=$2 AND state='pending'`, invitationID, accountID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}

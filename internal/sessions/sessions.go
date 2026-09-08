@@ -169,3 +169,47 @@ func newUUID() string {
 	}
 	return string(out)
 }
+
+// Presence is what a companion surface may know about someone: online, and in
+// which title. It is derived from the live session lease, so it needs no
+// separate state to keep in step with reality.
+type Presence struct {
+	AccountID string
+	Namespace string
+	TitleID   string
+	SinceUnix int64
+}
+
+// MaxPresenceAccounts caps one presence query. A friends list is the caller.
+const MaxPresenceAccounts = 200
+
+// GetPresence returns an entry for each of the given accounts that holds a live
+// session. Accounts that are offline are simply absent: no row, no guess. A
+// person in two titles at once yields the most recently registered session,
+// because the phone shows one line per friend.
+func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Presence, error) {
+	if len(accountIDs) == 0 {
+		return nil, nil
+	}
+	if len(accountIDs) > MaxPresenceAccounts {
+		return nil, ErrInvalid
+	}
+	rows, err := s.pool.Query(ctx, `SELECT DISTINCT ON (account_id)
+			account_id, namespace, title_id, extract(epoch FROM created_at)::bigint
+		FROM adapter_sessions
+		WHERE account_id = ANY($1::uuid[]) AND expires_at > now()
+		ORDER BY account_id, created_at DESC`, accountIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Presence
+	for rows.Next() {
+		var p Presence
+		if err := rows.Scan(&p.AccountID, &p.Namespace, &p.TitleID, &p.SinceUnix); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}

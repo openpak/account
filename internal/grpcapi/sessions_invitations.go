@@ -134,3 +134,58 @@ func mapInvitationErr(err error) error {
 	}
 	return status.Error(codes.Internal, "internal error")
 }
+
+// GetPresence answers who, among the given accounts, is online and in which
+// title. Read-only: it registers nothing and renews no lease.
+func (s *Server) GetPresence(ctx context.Context, req *accountv1.GetPresenceRequest) (*accountv1.GetPresenceResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	ps, err := s.sessions.GetPresence(ctx, req.GetAccountIds())
+	if err != nil {
+		return nil, mapSessionErr(err)
+	}
+	resp := &accountv1.GetPresenceResponse{}
+	for _, p := range ps {
+		resp.Presence = append(resp.Presence, &accountv1.Presence{
+			AccountId: p.AccountID, Namespace: p.Namespace, TitleId: p.TitleID, SinceUnix: p.SinceUnix,
+		})
+	}
+	return resp, nil
+}
+
+// ListInvitations reads an account's pending invitations without consuming
+// them. PollInvitations remains the only delivery path.
+func (s *Server) ListInvitations(ctx context.Context, req *accountv1.ListInvitationsRequest) (*accountv1.ListInvitationsResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	ins, err := s.invitations.List(ctx, req.GetAccountId(), req.GetLimit())
+	if err != nil {
+		return nil, mapInvitationErr(err)
+	}
+	resp := &accountv1.ListInvitationsResponse{}
+	for _, in := range ins {
+		resp.Invitations = append(resp.Invitations, &accountv1.InvitationSummary{
+			InvitationId:    in.ID,
+			FromAccountId:   in.FromAccountID,
+			FromDisplayName: in.FromDisplayName,
+			TitleId:         in.TitleID,
+			Namespace:       in.Namespace,
+			ExpiresAtUnix:   in.ExpiresAtUnix,
+		})
+	}
+	return resp, nil
+}
+
+// RejectInvitation declines one, scoped to the recipient.
+func (s *Server) RejectInvitation(ctx context.Context, req *accountv1.RejectInvitationRequest) (*accountv1.RejectInvitationResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	ok, err := s.invitations.Reject(ctx, req.GetAccountId(), req.GetInvitationId())
+	if err != nil {
+		return nil, mapInvitationErr(err)
+	}
+	return &accountv1.RejectInvitationResponse{Rejected: ok}, nil
+}

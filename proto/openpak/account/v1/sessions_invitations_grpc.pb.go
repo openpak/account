@@ -23,6 +23,7 @@ const (
 	Sessions_Heartbeat_FullMethodName       = "/openpak.account.v1.Sessions/Heartbeat"
 	Sessions_ExpireSession_FullMethodName   = "/openpak.account.v1.Sessions/ExpireSession"
 	Sessions_ResolveSession_FullMethodName  = "/openpak.account.v1.Sessions/ResolveSession"
+	Sessions_GetPresence_FullMethodName     = "/openpak.account.v1.Sessions/GetPresence"
 )
 
 // SessionsClient is the client API for Sessions service.
@@ -43,6 +44,10 @@ type SessionsClient interface {
 	ExpireSession(ctx context.Context, in *ExpireSessionRequest, opts ...grpc.CallOption) (*ExpireSessionResponse, error)
 	// Resolve the live session for an account and title, if any.
 	ResolveSession(ctx context.Context, in *ResolveSessionRequest, opts ...grpc.CallOption) (*ResolveSessionResponse, error)
+	// Presence for a set of accounts, derived from their live session leases:
+	// who is online and in which title. A read for companion surfaces (a phone
+	// showing a friends list); it registers nothing and renews nothing.
+	GetPresence(ctx context.Context, in *GetPresenceRequest, opts ...grpc.CallOption) (*GetPresenceResponse, error)
 }
 
 type sessionsClient struct {
@@ -93,6 +98,16 @@ func (c *sessionsClient) ResolveSession(ctx context.Context, in *ResolveSessionR
 	return out, nil
 }
 
+func (c *sessionsClient) GetPresence(ctx context.Context, in *GetPresenceRequest, opts ...grpc.CallOption) (*GetPresenceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPresenceResponse)
+	err := c.cc.Invoke(ctx, Sessions_GetPresence_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SessionsServer is the server API for Sessions service.
 // All implementations must embed UnimplementedSessionsServer
 // for forward compatibility.
@@ -111,6 +126,10 @@ type SessionsServer interface {
 	ExpireSession(context.Context, *ExpireSessionRequest) (*ExpireSessionResponse, error)
 	// Resolve the live session for an account and title, if any.
 	ResolveSession(context.Context, *ResolveSessionRequest) (*ResolveSessionResponse, error)
+	// Presence for a set of accounts, derived from their live session leases:
+	// who is online and in which title. A read for companion surfaces (a phone
+	// showing a friends list); it registers nothing and renews nothing.
+	GetPresence(context.Context, *GetPresenceRequest) (*GetPresenceResponse, error)
 	mustEmbedUnimplementedSessionsServer()
 }
 
@@ -132,6 +151,9 @@ func (UnimplementedSessionsServer) ExpireSession(context.Context, *ExpireSession
 }
 func (UnimplementedSessionsServer) ResolveSession(context.Context, *ResolveSessionRequest) (*ResolveSessionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveSession not implemented")
+}
+func (UnimplementedSessionsServer) GetPresence(context.Context, *GetPresenceRequest) (*GetPresenceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPresence not implemented")
 }
 func (UnimplementedSessionsServer) mustEmbedUnimplementedSessionsServer() {}
 func (UnimplementedSessionsServer) testEmbeddedByValue()                  {}
@@ -226,6 +248,24 @@ func _Sessions_ResolveSession_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sessions_GetPresence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPresenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionsServer).GetPresence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sessions_GetPresence_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionsServer).GetPresence(ctx, req.(*GetPresenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sessions_ServiceDesc is the grpc.ServiceDesc for Sessions service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -249,15 +289,21 @@ var Sessions_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "ResolveSession",
 			Handler:    _Sessions_ResolveSession_Handler,
 		},
+		{
+			MethodName: "GetPresence",
+			Handler:    _Sessions_GetPresence_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "openpak/account/v1/sessions_invitations.proto",
 }
 
 const (
-	Invitations_SendInvitation_FullMethodName  = "/openpak.account.v1.Invitations/SendInvitation"
-	Invitations_PollInvitations_FullMethodName = "/openpak.account.v1.Invitations/PollInvitations"
-	Invitations_AckInvitations_FullMethodName  = "/openpak.account.v1.Invitations/AckInvitations"
+	Invitations_SendInvitation_FullMethodName   = "/openpak.account.v1.Invitations/SendInvitation"
+	Invitations_PollInvitations_FullMethodName  = "/openpak.account.v1.Invitations/PollInvitations"
+	Invitations_AckInvitations_FullMethodName   = "/openpak.account.v1.Invitations/AckInvitations"
+	Invitations_ListInvitations_FullMethodName  = "/openpak.account.v1.Invitations/ListInvitations"
+	Invitations_RejectInvitation_FullMethodName = "/openpak.account.v1.Invitations/RejectInvitation"
 )
 
 // InvitationsClient is the client API for Invitations service.
@@ -279,6 +325,16 @@ type InvitationsClient interface {
 	// Acknowledge received invitations (id + nonce pairs). Only pending
 	// invitations matching namespace/account/nonce are marked delivered.
 	AckInvitations(ctx context.Context, in *AckInvitationsRequest, opts ...grpc.CallOption) (*AckInvitationsResponse, error)
+	// Read the pending invitations addressed to an account, across every
+	// namespace, WITHOUT consuming them: no redelivery window is started and
+	// nothing is marked delivered, so a companion app showing an inbox cannot
+	// take an invitation away from the adapter that has to deliver it. The
+	// summary carries no payload and no nonce; both belong to that adapter.
+	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
+	// Reject an invitation on behalf of its recipient (the "decline" button).
+	// Only the account it was addressed to can reject it, and only while it is
+	// still pending.
+	RejectInvitation(ctx context.Context, in *RejectInvitationRequest, opts ...grpc.CallOption) (*RejectInvitationResponse, error)
 }
 
 type invitationsClient struct {
@@ -319,6 +375,26 @@ func (c *invitationsClient) AckInvitations(ctx context.Context, in *AckInvitatio
 	return out, nil
 }
 
+func (c *invitationsClient) ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListInvitationsResponse)
+	err := c.cc.Invoke(ctx, Invitations_ListInvitations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *invitationsClient) RejectInvitation(ctx context.Context, in *RejectInvitationRequest, opts ...grpc.CallOption) (*RejectInvitationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RejectInvitationResponse)
+	err := c.cc.Invoke(ctx, Invitations_RejectInvitation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InvitationsServer is the server API for Invitations service.
 // All implementations must embed UnimplementedInvitationsServer
 // for forward compatibility.
@@ -338,6 +414,16 @@ type InvitationsServer interface {
 	// Acknowledge received invitations (id + nonce pairs). Only pending
 	// invitations matching namespace/account/nonce are marked delivered.
 	AckInvitations(context.Context, *AckInvitationsRequest) (*AckInvitationsResponse, error)
+	// Read the pending invitations addressed to an account, across every
+	// namespace, WITHOUT consuming them: no redelivery window is started and
+	// nothing is marked delivered, so a companion app showing an inbox cannot
+	// take an invitation away from the adapter that has to deliver it. The
+	// summary carries no payload and no nonce; both belong to that adapter.
+	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
+	// Reject an invitation on behalf of its recipient (the "decline" button).
+	// Only the account it was addressed to can reject it, and only while it is
+	// still pending.
+	RejectInvitation(context.Context, *RejectInvitationRequest) (*RejectInvitationResponse, error)
 	mustEmbedUnimplementedInvitationsServer()
 }
 
@@ -356,6 +442,12 @@ func (UnimplementedInvitationsServer) PollInvitations(context.Context, *PollInvi
 }
 func (UnimplementedInvitationsServer) AckInvitations(context.Context, *AckInvitationsRequest) (*AckInvitationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AckInvitations not implemented")
+}
+func (UnimplementedInvitationsServer) ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListInvitations not implemented")
+}
+func (UnimplementedInvitationsServer) RejectInvitation(context.Context, *RejectInvitationRequest) (*RejectInvitationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RejectInvitation not implemented")
 }
 func (UnimplementedInvitationsServer) mustEmbedUnimplementedInvitationsServer() {}
 func (UnimplementedInvitationsServer) testEmbeddedByValue()                     {}
@@ -432,6 +524,42 @@ func _Invitations_AckInvitations_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Invitations_ListInvitations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListInvitationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvitationsServer).ListInvitations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Invitations_ListInvitations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvitationsServer).ListInvitations(ctx, req.(*ListInvitationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Invitations_RejectInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejectInvitationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvitationsServer).RejectInvitation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Invitations_RejectInvitation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvitationsServer).RejectInvitation(ctx, req.(*RejectInvitationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Invitations_ServiceDesc is the grpc.ServiceDesc for Invitations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -450,6 +578,14 @@ var Invitations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AckInvitations",
 			Handler:    _Invitations_AckInvitations_Handler,
+		},
+		{
+			MethodName: "ListInvitations",
+			Handler:    _Invitations_ListInvitations_Handler,
+		},
+		{
+			MethodName: "RejectInvitation",
+			Handler:    _Invitations_RejectInvitation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
