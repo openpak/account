@@ -723,3 +723,51 @@ func TestPlayerCountsCountPeople(t *testing.T) {
 		t.Errorf("total = %d, want 2 people", counts.GetTotalPlayers())
 	}
 }
+
+// Signed in and playing are different facts and the status page reports them
+// separately. A session with no title is the first without the second: it is a
+// person online, on a network, in nothing.
+func TestOnlineWithoutPlayingCountsAsOnlineOnly(t *testing.T) {
+	_, _, _, sess, _, _, ident := startGRPC(t)
+	ctx := authCtx()
+
+	idle, _, err := ident.Register(ctx, "online-idle@example.com", "correct horse battery", "Idle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	playing, _, err := ident.Register(ctx, "online-playing@example.com", "correct horse battery", "Playing")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := sess.RegisterSession(ctx, &accountv1.RegisterSessionRequest{
+		AccountId: idle.ID, Namespace: "switch", TitleId: "", EndpointRef: "ep"}); err != nil {
+		t.Fatalf("a title-less session is signed in, not invalid: %v", err)
+	}
+	if _, err := sess.RegisterSession(ctx, &accountv1.RegisterSessionRequest{
+		AccountId: playing.ID, Namespace: "switch", TitleId: "0100152000022000", EndpointRef: "ep"}); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := sess.GetPlayerCounts(ctx, &accountv1.GetPlayerCountsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if n := len(counts.GetTitles()); n != 1 {
+		t.Errorf("titles = %d, want only the one anybody is actually playing", n)
+	}
+	for _, tp := range counts.GetTitles() {
+		if tp.GetTitleId() == "" {
+			t.Error("the person in no game was reported as playing a title with no name")
+		}
+	}
+	if counts.GetTotalPlayers() != 2 {
+		t.Errorf("online = %d, want both of them", counts.GetTotalPlayers())
+	}
+	for _, n := range counts.GetNetworks() {
+		if n.GetNamespace() == "switch" && n.GetPlayers() != 2 {
+			t.Errorf("online on switch = %d, want 2", n.GetPlayers())
+		}
+	}
+}

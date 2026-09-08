@@ -41,7 +41,10 @@ func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 // same (account, title). Returns the server-assigned session ID and the
 // applied lease.
 func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, endpointRef string, lease time.Duration) (string, time.Duration, error) {
-	if accountID == "" || namespace == "" || titleID == "" || endpointRef == "" {
+	// titleID may be empty, and that is a fact rather than a gap: it means signed in to this
+	// network and not in any title. Being online and playing something are different things and
+	// the status page reports them separately, so the distinction has to survive down here.
+	if accountID == "" || namespace == "" || endpointRef == "" {
 		return "", 0, ErrInvalid
 	}
 	if lease <= 0 {
@@ -221,13 +224,21 @@ type TitlePlayers struct {
 	Players   int
 }
 
-// PlayerCounts reports who is playing what, from the same live leases presence
-// reads. Accounts are counted, not sessions: one person with a console and an
-// emulator open is one player, and a status page that said two would be
-// wrong in the direction that flatters us.
+// PlayerCounts reports two different facts and keeps them apart.
+//
+// Titles are who is *playing* what. Networks and the total are who is *online*
+// on each network — a person signed in with nothing running is online and is
+// playing nothing, and reporting them as a player would be a lie in the
+// direction that flatters us.
+//
+// Accounts are counted, not sessions, in both: one person with a console and an
+// emulator open is one person.
 func (s *Service) PlayerCounts(ctx context.Context) ([]TitlePlayers, []NetworkPlayers, int, error) {
+	// Titles are who is playing what, so the title-less sessions — signed in, in no game — are
+	// left out here. They are counted per network and in the total below, which are about being
+	// online rather than about playing.
 	rows, err := s.pool.Query(ctx, `SELECT title_id, namespace, count(DISTINCT account_id)
-		FROM adapter_sessions WHERE expires_at > now()
+		FROM adapter_sessions WHERE expires_at > now() AND title_id <> ''
 		GROUP BY title_id, namespace ORDER BY count(DISTINCT account_id) DESC, title_id`)
 	if err != nil {
 		return nil, nil, 0, err
