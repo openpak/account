@@ -675,3 +675,51 @@ func eventsSince(t *testing.T, ev accountv1.EventsClient, since uint64) []*accou
 	}
 	return resp.GetEvents()
 }
+
+// A status page counts people, not sessions: someone playing on a console and
+// an emulator at once is one player online, and the total that flatters us is
+// the wrong one.
+func TestPlayerCountsCountPeople(t *testing.T) {
+	_, _, _, sess, _, _, ident := startGRPC(t)
+	ctx := authCtx()
+
+	a, _, err := ident.Register(ctx, "count-a@example.com", "correct horse battery", "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := ident.Register(ctx, "count-b@example.com", "correct horse battery", "B")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const kart, splat = "0100152000022000", "0100C2500FC20000"
+
+	counts, err := sess.GetPlayerCounts(ctx, &accountv1.GetPlayerCountsRequest{})
+	if err != nil || counts.GetTotalPlayers() != 0 || len(counts.GetTitles()) != 0 {
+		t.Fatalf("nobody playing: %+v %v", counts, err)
+	}
+
+	for _, r := range []struct{ acct, title string }{
+		{a.ID, kart}, {b.ID, kart}, {a.ID, splat},
+	} {
+		if _, err := sess.RegisterSession(ctx, &accountv1.RegisterSessionRequest{
+			AccountId: r.acct, Namespace: "switch", TitleId: r.title, EndpointRef: "ep"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	counts, err = sess.GetPlayerCounts(ctx, &accountv1.GetPlayerCountsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]int32{}
+	for _, tp := range counts.GetTitles() {
+		got[tp.GetTitleId()] = tp.GetPlayers()
+	}
+	if got[kart] != 2 || got[splat] != 1 {
+		t.Errorf("per title: %v", got)
+	}
+	// Two people, three sessions.
+	if counts.GetTotalPlayers() != 2 {
+		t.Errorf("total = %d, want 2 people", counts.GetTotalPlayers())
+	}
+}

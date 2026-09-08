@@ -189,3 +189,22 @@ func (s *Server) RejectInvitation(ctx context.Context, req *accountv1.RejectInvi
 	}
 	return &accountv1.RejectInvitationResponse{Rejected: ok}, nil
 }
+
+// GetPlayerCounts answers who is playing what. Read-only, and cheap enough for
+// a status page to ask on every render.
+func (s *Server) GetPlayerCounts(ctx context.Context, _ *accountv1.GetPlayerCountsRequest) (*accountv1.GetPlayerCountsResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	titles, total, err := s.sessions.PlayerCounts(ctx)
+	if err != nil {
+		return nil, mapSessionErr(err)
+	}
+	resp := &accountv1.GetPlayerCountsResponse{TotalPlayers: int32(total)}
+	for _, t := range titles {
+		resp.Titles = append(resp.Titles, &accountv1.TitlePlayers{
+			TitleId: t.TitleID, Namespace: t.Namespace, Players: int32(t.Players),
+		})
+	}
+	return resp, nil
+}

@@ -213,3 +213,43 @@ func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Prese
 	}
 	return out, rows.Err()
 }
+
+// TitlePlayers is how many people are in one title right now.
+type TitlePlayers struct {
+	TitleID   string
+	Namespace string
+	Players   int
+}
+
+// PlayerCounts reports who is playing what, from the same live leases presence
+// reads. Accounts are counted, not sessions: one person with a console and an
+// emulator open is one player, and a status page that said two would be
+// wrong in the direction that flatters us.
+func (s *Service) PlayerCounts(ctx context.Context) ([]TitlePlayers, int, error) {
+	rows, err := s.pool.Query(ctx, `SELECT title_id, namespace, count(DISTINCT account_id)
+		FROM adapter_sessions WHERE expires_at > now()
+		GROUP BY title_id, namespace ORDER BY count(DISTINCT account_id) DESC, title_id`)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var out []TitlePlayers
+	for rows.Next() {
+		var t TitlePlayers
+		if err := rows.Scan(&t.TitleID, &t.Namespace, &t.Players); err != nil {
+			return nil, 0, err
+		}
+		out = append(out, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	// Someone in two titles is one person online, so the total is its own
+	// query rather than the sum of the rows above.
+	var total int
+	if err := s.pool.QueryRow(ctx, `SELECT count(DISTINCT account_id)
+		FROM adapter_sessions WHERE expires_at > now()`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	return out, total, nil
+}

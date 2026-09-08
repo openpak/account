@@ -24,6 +24,7 @@ const (
 	Sessions_ExpireSession_FullMethodName   = "/openpak.account.v1.Sessions/ExpireSession"
 	Sessions_ResolveSession_FullMethodName  = "/openpak.account.v1.Sessions/ResolveSession"
 	Sessions_GetPresence_FullMethodName     = "/openpak.account.v1.Sessions/GetPresence"
+	Sessions_GetPlayerCounts_FullMethodName = "/openpak.account.v1.Sessions/GetPlayerCounts"
 )
 
 // SessionsClient is the client API for Sessions service.
@@ -48,6 +49,10 @@ type SessionsClient interface {
 	// who is online and in which title. A read for companion surfaces (a phone
 	// showing a friends list); it registers nothing and renews nothing.
 	GetPresence(ctx context.Context, in *GetPresenceRequest, opts ...grpc.CallOption) (*GetPresenceResponse, error)
+	// How many people are playing, per title. Derived from the same live leases
+	// as presence, so a status page and a friends list can never disagree about
+	// who is online. Counts accounts, not sessions.
+	GetPlayerCounts(ctx context.Context, in *GetPlayerCountsRequest, opts ...grpc.CallOption) (*GetPlayerCountsResponse, error)
 }
 
 type sessionsClient struct {
@@ -108,6 +113,16 @@ func (c *sessionsClient) GetPresence(ctx context.Context, in *GetPresenceRequest
 	return out, nil
 }
 
+func (c *sessionsClient) GetPlayerCounts(ctx context.Context, in *GetPlayerCountsRequest, opts ...grpc.CallOption) (*GetPlayerCountsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPlayerCountsResponse)
+	err := c.cc.Invoke(ctx, Sessions_GetPlayerCounts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SessionsServer is the server API for Sessions service.
 // All implementations must embed UnimplementedSessionsServer
 // for forward compatibility.
@@ -130,6 +145,10 @@ type SessionsServer interface {
 	// who is online and in which title. A read for companion surfaces (a phone
 	// showing a friends list); it registers nothing and renews nothing.
 	GetPresence(context.Context, *GetPresenceRequest) (*GetPresenceResponse, error)
+	// How many people are playing, per title. Derived from the same live leases
+	// as presence, so a status page and a friends list can never disagree about
+	// who is online. Counts accounts, not sessions.
+	GetPlayerCounts(context.Context, *GetPlayerCountsRequest) (*GetPlayerCountsResponse, error)
 	mustEmbedUnimplementedSessionsServer()
 }
 
@@ -154,6 +173,9 @@ func (UnimplementedSessionsServer) ResolveSession(context.Context, *ResolveSessi
 }
 func (UnimplementedSessionsServer) GetPresence(context.Context, *GetPresenceRequest) (*GetPresenceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPresence not implemented")
+}
+func (UnimplementedSessionsServer) GetPlayerCounts(context.Context, *GetPlayerCountsRequest) (*GetPlayerCountsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPlayerCounts not implemented")
 }
 func (UnimplementedSessionsServer) mustEmbedUnimplementedSessionsServer() {}
 func (UnimplementedSessionsServer) testEmbeddedByValue()                  {}
@@ -266,6 +288,24 @@ func _Sessions_GetPresence_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sessions_GetPlayerCounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlayerCountsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionsServer).GetPlayerCounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sessions_GetPlayerCounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionsServer).GetPlayerCounts(ctx, req.(*GetPlayerCountsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sessions_ServiceDesc is the grpc.ServiceDesc for Sessions service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -292,6 +332,10 @@ var Sessions_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPresence",
 			Handler:    _Sessions_GetPresence_Handler,
+		},
+		{
+			MethodName: "GetPlayerCounts",
+			Handler:    _Sessions_GetPlayerCounts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -22,6 +22,10 @@ service Sessions {
   // who is online and in which title. A read for companion surfaces (a phone
   // showing a friends list); it registers nothing and renews nothing.
   rpc GetPresence(GetPresenceRequest) returns (GetPresenceResponse);
+  // How many people are playing, per title. Derived from the same live leases
+  // as presence, so a status page and a friends list can never disagree about
+  // who is online. Counts accounts, not sessions.
+  rpc GetPlayerCounts(GetPlayerCountsRequest) returns (GetPlayerCountsResponse);
 }
 
 service Invitations {
@@ -167,3 +171,16 @@ message RejectInvitationRequest {
 }
 
 message RejectInvitationResponse { bool rejected = 1; }
+
+message GetPlayerCountsRequest {}
+
+message GetPlayerCountsResponse {
+  repeated TitlePlayers titles = 1;
+  int32 total_players = 2; // distinct accounts, not the sum of the rows
+}
+
+message TitlePlayers {
+  string title_id = 1;
+  string namespace = 2;
+  int32 players = 3;
+}
