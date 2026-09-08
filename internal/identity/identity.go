@@ -123,6 +123,9 @@ func validateRegistration(email, password, displayName string) error {
 type Profile struct {
 	Country  string // ISO 3166-1 alpha-2, e.g. "GB"
 	Birthday string // ISO 8601 date, e.g. "1990-01-01"
+	// DisplayName is what other people see. Empty in an update means "leave it
+	// alone", because a blank name is never what someone meant.
+	DisplayName string
 }
 
 func (s *Service) Register(ctx context.Context, email, password, displayName string) (*Account, string, error) {
@@ -174,9 +177,13 @@ func (s *Service) UpdateProfile(ctx context.Context, accountID string, p Profile
 	if p.Birthday != "" {
 		birthday = p.Birthday
 	}
+	// A blank display name leaves the existing one: an update that omits a
+	// field must not erase it.
 	tag, err := s.pool.Exec(ctx,
-		`UPDATE accounts SET country = $2, birthday = $3, updated_at = now() WHERE id = $1`,
-		accountID, p.Country, birthday)
+		`UPDATE accounts SET country = $2, birthday = $3,
+			display_name = COALESCE(NULLIF($4,''), display_name), updated_at = now()
+		WHERE id = $1`,
+		accountID, p.Country, birthday, p.DisplayName)
 	if err != nil {
 		return nil, fmt.Errorf("identity: update profile: %w", err)
 	}
@@ -645,6 +652,13 @@ func validateProfile(p *Profile) error {
 		if _, err := time.Parse("2006-01-02", p.Birthday); err != nil {
 			return errors.New("identity: birthday must be YYYY-MM-DD")
 		}
+	}
+	p.DisplayName = strings.TrimSpace(p.DisplayName)
+	if n := len([]rune(p.DisplayName)); n > 0 && (n < 3 || n > 32) {
+		return errors.New("identity: display name must be 3 to 32 characters")
+	}
+	if strings.ContainsAny(p.DisplayName, "\n\r\t") {
+		return errors.New("identity: display name cannot contain line breaks")
 	}
 	return nil
 }

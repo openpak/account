@@ -357,18 +357,23 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, ac
 // and nothing downstream invents a value for what is missing.
 func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
 	var req struct {
-		Country  string `json:"country"`
-		Birthday string `json:"birthday"`
+		Country     string `json:"country"`
+		Birthday    string `json:"birthday"`
+		DisplayName string `json:"display_name"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	updated, err := s.identity.UpdateProfile(r.Context(), acct.ID, identity.Profile{Country: req.Country, Birthday: req.Birthday})
+	updated, err := s.identity.UpdateProfile(r.Context(), acct.ID, identity.Profile{
+		Country: req.Country, Birthday: req.Birthday, DisplayName: req.DisplayName})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"country": updated.Country, "birthday": updated.Birthday})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"country": updated.Country, "birthday": updated.Birthday,
+		"display_name": updated.DisplayName,
+	})
 }
 
 // adapterProxy forwards the console-link page to the Switch adapter under this service's own
