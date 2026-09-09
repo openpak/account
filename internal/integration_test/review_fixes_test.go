@@ -278,7 +278,7 @@ func TestReviewSessionsRejectBanned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sid, _, err := sessSvc.Register(ctx, acct.ID, "synthetic", "0005000010143500", "127.0.0.1:1", 0)
+	sid, _, err := sessSvc.Register(ctx, acct.ID, "synthetic", "0005000010143500", "127.0.0.1:1", "home", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestReviewSessionsRejectBanned(t *testing.T) {
 	if err := ident.SetBanned(ctx, acct.ID, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := sessSvc.Register(ctx, acct.ID, "synthetic", "0005000010143500", "127.0.0.1:1", 0); err != nil {
+	if _, _, err := sessSvc.Register(ctx, acct.ID, "synthetic", "0005000010143500", "127.0.0.1:1", "home", 0); err != nil {
 		t.Fatalf("register after unban: %v", err)
 	}
 }

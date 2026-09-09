@@ -31,6 +31,7 @@ type Session struct {
 	Namespace   string
 	TitleID     string
 	EndpointRef string
+	NodeID      string
 }
 
 type Service struct{ pool *pgxpool.Pool }
@@ -40,11 +41,11 @@ func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 // Register inserts a live session, replacing any previous session for the
 // same (account, title). Returns the server-assigned session ID and the
 // applied lease.
-func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, endpointRef string, lease time.Duration) (string, time.Duration, error) {
+func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, endpointRef, nodeID string, lease time.Duration) (string, time.Duration, error) {
 	// titleID may be empty, and that is a fact rather than a gap: it means signed in to this
 	// network and not in any title. Being online and playing something are different things and
 	// the status page reports them separately, so the distinction has to survive down here.
-	if accountID == "" || namespace == "" || endpointRef == "" {
+	if accountID == "" || namespace == "" || endpointRef == "" || nodeID == "" {
 		return "", 0, ErrInvalid
 	}
 	if lease <= 0 {
@@ -66,15 +67,16 @@ func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, e
 	// Atomic replacement: the unique (account_id, title_id) key backs an
 	// upsert, so concurrent registrations converge on exactly one live row.
 	if _, err := s.pool.Exec(ctx, `INSERT INTO adapter_sessions
-		(session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
-		VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))
+		(session_id, account_id, namespace, title_id, endpoint_ref, node_id, expires_at)
+		VALUES ($1,$2,$3,$4,$5,$7, now() + make_interval(secs => $6))
 		ON CONFLICT (account_id, title_id) DO UPDATE SET
 			session_id = EXCLUDED.session_id,
 			namespace = EXCLUDED.namespace,
 			endpoint_ref = EXCLUDED.endpoint_ref,
+			node_id = EXCLUDED.node_id,
 			expires_at = EXCLUDED.expires_at,
 			updated_at = now()`,
-		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds())); err != nil {
+		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds()), nodeID); err != nil {
 		return "", 0, fmt.Errorf("sessions: register: %w", err)
 	}
 	return id, lease, nil
@@ -181,6 +183,7 @@ type Presence struct {
 	Namespace string
 	TitleID   string
 	SinceUnix int64
+	NodeID    string
 }
 
 // MaxPresenceAccounts caps one presence query. A friends list is the caller.
@@ -198,7 +201,7 @@ func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Prese
 		return nil, ErrInvalid
 	}
 	rows, err := s.pool.Query(ctx, `SELECT DISTINCT ON (account_id)
-			account_id, namespace, title_id, extract(epoch FROM created_at)::bigint
+			account_id, namespace, title_id, extract(epoch FROM created_at)::bigint, node_id
 		FROM adapter_sessions
 		WHERE account_id = ANY($1::uuid[]) AND expires_at > now()
 		ORDER BY account_id, created_at DESC`, accountIDs)
@@ -209,7 +212,7 @@ func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Prese
 	var out []Presence
 	for rows.Next() {
 		var p Presence
-		if err := rows.Scan(&p.AccountID, &p.Namespace, &p.TitleID, &p.SinceUnix); err != nil {
+		if err := rows.Scan(&p.AccountID, &p.Namespace, &p.TitleID, &p.SinceUnix, &p.NodeID); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -233,7 +236,7 @@ type TitlePlayers struct {
 //
 // Accounts are counted, not sessions, in both: one person with a console and an
 // emulator open is one person.
-func (s *Service) PlayerCounts(ctx context.Context) ([]TitlePlayers, []NetworkPlayers, int, error) {
+func (s *Service) PlayerCounts(ctx context.Context) ([]TitlePlayers, []NetworkPlayers, []NodePlayers, int, error) {
 	// Titles are who is playing what, so the title-less sessions — signed in, in no game — are
 	// left out here. They are counted per network and in the total below, which are about being
 	// online rather than about playing.
@@ -241,19 +244,19 @@ func (s *Service) PlayerCounts(ctx context.Context) ([]TitlePlayers, []NetworkPl
 		FROM adapter_sessions WHERE expires_at > now() AND title_id <> ''
 		GROUP BY title_id, namespace ORDER BY count(DISTINCT account_id) DESC, title_id`)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 	defer rows.Close()
 	var out []TitlePlayers
 	for rows.Next() {
 		var t TitlePlayers
 		if err := rows.Scan(&t.TitleID, &t.Namespace, &t.Players); err != nil {
-			return nil, nil, 0, err
+			return nil, nil, nil, 0, err
 		}
 		out = append(out, t)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 
 	// Per network, for the same reason the total is its own query: two titles
@@ -262,19 +265,39 @@ func (s *Service) PlayerCounts(ctx context.Context) ([]TitlePlayers, []NetworkPl
 		FROM adapter_sessions WHERE expires_at > now()
 		GROUP BY namespace ORDER BY namespace`)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 	defer nrows.Close()
 	var nets []NetworkPlayers
 	for nrows.Next() {
 		var n NetworkPlayers
 		if err := nrows.Scan(&n.Namespace, &n.Players); err != nil {
-			return nil, nil, 0, err
+			return nil, nil, nil, 0, err
 		}
 		nets = append(nets, n)
 	}
 	if err := nrows.Err(); err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
+	}
+
+	// Per federation node: where people are.
+	drows, err := s.pool.Query(ctx, `SELECT node_id, count(DISTINCT account_id)
+		FROM adapter_sessions WHERE expires_at > now()
+		GROUP BY node_id ORDER BY node_id`)
+	if err != nil {
+		return nil, nil, nil, 0, err
+	}
+	defer drows.Close()
+	var nodes []NodePlayers
+	for drows.Next() {
+		var n NodePlayers
+		if err := drows.Scan(&n.NodeID, &n.Players); err != nil {
+			return nil, nil, nil, 0, err
+		}
+		nodes = append(nodes, n)
+	}
+	if err := drows.Err(); err != nil {
+		return nil, nil, nil, 0, err
 	}
 
 	// Someone in two titles is one person online, so the total is its own
@@ -282,9 +305,15 @@ func (s *Service) PlayerCounts(ctx context.Context) ([]TitlePlayers, []NetworkPl
 	var total int
 	if err := s.pool.QueryRow(ctx, `SELECT count(DISTINCT account_id)
 		FROM adapter_sessions WHERE expires_at > now()`).Scan(&total); err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
-	return out, nets, total, nil
+	return out, nets, nodes, total, nil
+}
+
+// NodePlayers is how many people are on one federation node.
+type NodePlayers struct {
+	NodeID  string
+	Players int
 }
 
 // NetworkPlayers is how many people are on one console network.

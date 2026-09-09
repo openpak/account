@@ -19,7 +19,7 @@ func (s *Server) RegisterSession(ctx context.Context, req *accountv1.RegisterSes
 		return nil, err
 	}
 	id, lease, err := s.sessions.Register(ctx, req.GetAccountId(), req.GetNamespace(),
-		req.GetTitleId(), req.GetEndpointRef(), time.Duration(req.GetLeaseSeconds())*time.Second)
+		req.GetTitleId(), req.GetEndpointRef(), NodeFromContext(ctx), time.Duration(req.GetLeaseSeconds())*time.Second)
 	if err != nil {
 		return nil, mapSessionErr(err)
 	}
@@ -148,7 +148,7 @@ func (s *Server) GetPresence(ctx context.Context, req *accountv1.GetPresenceRequ
 	resp := &accountv1.GetPresenceResponse{}
 	for _, p := range ps {
 		resp.Presence = append(resp.Presence, &accountv1.Presence{
-			AccountId: p.AccountID, Namespace: p.Namespace, TitleId: p.TitleID, SinceUnix: p.SinceUnix,
+			AccountId: p.AccountID, Namespace: p.Namespace, TitleId: p.TitleID, SinceUnix: p.SinceUnix, NodeId: p.NodeID,
 		})
 	}
 	return resp, nil
@@ -196,7 +196,7 @@ func (s *Server) GetPlayerCounts(ctx context.Context, _ *accountv1.GetPlayerCoun
 	if err := s.authorize(ctx); err != nil {
 		return nil, err
 	}
-	titles, networks, total, err := s.sessions.PlayerCounts(ctx)
+	titles, networks, nodes, total, err := s.sessions.PlayerCounts(ctx)
 	if err != nil {
 		return nil, mapSessionErr(err)
 	}
@@ -210,6 +210,9 @@ func (s *Server) GetPlayerCounts(ctx context.Context, _ *accountv1.GetPlayerCoun
 		resp.Networks = append(resp.Networks, &accountv1.NetworkPlayers{
 			Namespace: n.Namespace, Players: int32(n.Players),
 		})
+	}
+	for _, n := range nodes {
+		resp.Nodes = append(resp.Nodes, &accountv1.NodePlayers{NodeId: n.NodeID, Players: int32(n.Players)})
 	}
 	return resp, nil
 }

@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"openpak/account/internal/events"
+	"openpak/account/internal/federation"
 	"openpak/account/internal/grpcapi"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/invitations"
@@ -25,6 +26,10 @@ import (
 	"openpak/account/internal/storage"
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
+
+// lastConn is the connection behind the clients startGRPC returned last, for
+// a test that needs a client the fixed return list does not carry.
+var lastConn *grpc.ClientConn
 
 const grpcInternalKey = "test-internal-key-0123456789abcdef0123456789"
 
@@ -51,14 +56,16 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, a
 	invSvc := invitations.New(pool, soc, testResolver{sessSvc}, evSvc)
 
 	lis := bufconn.Listen(1024 * 1024)
-	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(grpcInternalKey)))
-	api := grpcapi.New(ident, lnks, evSvc, soc, sessSvc, invSvc, grpcapi.Options{})
+	fedSvc := federation.New(pool, grpcInternalKey)
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(fedSvc)))
+	api := grpcapi.New(ident, lnks, evSvc, soc, sessSvc, invSvc, grpcapi.Options{Federation: fedSvc})
 	accountv1.RegisterIdentityServer(srv, api)
 	accountv1.RegisterLinksServer(srv, api)
 	accountv1.RegisterEventsServer(srv, api)
 	accountv1.RegisterSocialServer(srv, api)
 	accountv1.RegisterSessionsServer(srv, api)
 	accountv1.RegisterInvitationsServer(srv, api)
+	accountv1.RegisterFederationServer(srv, api)
 	go srv.Serve(lis)
 	t.Cleanup(srv.Stop)
 
@@ -71,6 +78,7 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, a
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
+	lastConn = conn
 	return accountv1.NewIdentityClient(conn), accountv1.NewLinksClient(conn),
 		accountv1.NewSocialClient(conn), accountv1.NewSessionsClient(conn),
 		accountv1.NewInvitationsClient(conn), accountv1.NewEventsClient(conn), ident

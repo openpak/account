@@ -4,7 +4,6 @@ package grpcapi
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 
 	"google.golang.org/grpc"
@@ -14,6 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"openpak/account/internal/events"
+	"openpak/account/internal/federation"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/invitations"
 	"openpak/account/internal/links"
@@ -31,7 +31,9 @@ type Server struct {
 	accountv1.UnimplementedSocialServer
 	accountv1.UnimplementedSessionsServer
 	accountv1.UnimplementedInvitationsServer
+	accountv1.UnimplementedFederationServer
 	identity    *identity.Service
+	federation  *federation.Service
 	links       *links.Service
 	events      *events.Service
 	social      *social.Service
@@ -48,13 +50,15 @@ type Options struct {
 	// SiteBaseURL is the user-facing site (ACCOUNT_EMAIL_LINK_BASE). When set, emailed
 	// links point at its routes instead of the core's, so the core can stay internal.
 	SiteBaseURL string
+	// Federation is the node register. Nil only in tests that never touch it.
+	Federation *federation.Service
 }
 
 func New(ident *identity.Service, lnks *links.Service, evs *events.Service, soc *social.Service, sess *sessions.Service, inv *invitations.Service, opts Options) *Server {
 	if opts.BaseURL == "" {
 		opts.BaseURL = "http://localhost:8000"
 	}
-	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL, siteBaseURL: opts.SiteBaseURL}
+	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL, siteBaseURL: opts.SiteBaseURL, federation: opts.Federation}
 }
 
 func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsRequest) (*accountv1.PollEventsResponse, error) {
@@ -64,17 +68,38 @@ func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsReques
 	return s.events.Poll(ctx, req.GetSinceVersion(), req.GetLimit())
 }
 
+// NodeAuth resolves a presented credential to a federation node id.
+type NodeAuth interface {
+	Authenticate(ctx context.Context, key string) (string, bool)
+}
+
+type nodeKey struct{}
+
 // Interceptor returns the server interceptor enforcing internal credentials.
-// An empty internal key is a startup failure (config), so this can never
-// degrade to unauthenticated access.
-func Interceptor(internalKey string) grpc.UnaryServerInterceptor {
+// The credential names a node ("home" for ACCOUNT_INTERNAL_KEY, a region
+// otherwise) and the node id travels in the context, so a handler that must
+// know who called reads it from there and never from the request.
+func Interceptor(auth NodeAuth) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		v, ok := credsFromContext(ctx)
-		if !ok || v == "" || subtle.ConstantTimeCompare([]byte(v), []byte(internalKey)) != 1 {
+		if !ok || v == "" {
 			return nil, status.Error(codes.Unauthenticated, "missing or invalid internal credentials")
 		}
-		return handler(ctx, req)
+		node, ok := auth.Authenticate(ctx, v)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "missing or invalid internal credentials")
+		}
+		return handler(context.WithValue(ctx, nodeKey{}, node), req)
 	}
+}
+
+// NodeFromContext is the node the interceptor authenticated; "home" when a
+// handler is called without one (direct calls in tests).
+func NodeFromContext(ctx context.Context) string {
+	if n, ok := ctx.Value(nodeKey{}).(string); ok && n != "" {
+		return n
+	}
+	return federation.Home
 }
 
 func credsFromContext(ctx context.Context) (string, bool) {

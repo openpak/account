@@ -19,6 +19,7 @@ import (
 
 	"openpak/account/internal/config"
 	"openpak/account/internal/events"
+	"openpak/account/internal/federation"
 	"openpak/account/internal/grpcapi"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/invitations"
@@ -98,8 +99,9 @@ func run() error {
 	if len(internalKey) < 32 {
 		return errors.New("ACCOUNT_INTERNAL_KEY must be set (>=32 bytes); internal RPCs fail closed")
 	}
-	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(internalKey)))
-	apiSrv := grpcapi.New(ident, lnks, evSvc, socSvc, sessSvc, invSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), SiteBaseURL: os.Getenv("ACCOUNT_EMAIL_LINK_BASE")})
+	fedSvc := federation.New(pool, internalKey)
+	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(fedSvc)))
+	apiSrv := grpcapi.New(ident, lnks, evSvc, socSvc, sessSvc, invSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), SiteBaseURL: os.Getenv("ACCOUNT_EMAIL_LINK_BASE"), Federation: fedSvc})
 	accountv1.RegisterIdentityServer(grpcSrv, apiSrv)
 	accountv1.RegisterLinksServer(grpcSrv, apiSrv)
 	accountv1.RegisterEventsServer(grpcSrv, apiSrv)
@@ -107,6 +109,7 @@ func run() error {
 	accountv1.RegisterSocialServer(grpcSrv, apiSrv)
 	accountv1.RegisterSessionsServer(grpcSrv, apiSrv)
 	accountv1.RegisterInvitationsServer(grpcSrv, apiSrv)
+	accountv1.RegisterFederationServer(grpcSrv, apiSrv)
 	healthSrv := health.NewServer()
 	healthSrv.SetServingStatus("account", healthv1.HealthCheckResponse_SERVING)
 	healthv1.RegisterHealthServer(grpcSrv, healthSrv)
