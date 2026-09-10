@@ -148,13 +148,25 @@ func (s *Service) RequestFriend(ctx context.Context, requesterID, addresseeID, i
 // AcceptFriend accepts a pending incoming request. Idempotent when already
 // accepted.
 func (s *Service) AcceptFriend(ctx context.Context, addresseeID, requesterID, _ string) (State, error) {
-	tag, err := s.pool.Exec(ctx, `UPDATE friendships SET state='accepted', updated_at=now()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE friendships SET state='accepted', updated_at=now()
 		WHERE requester_id=$1 AND addressee_id=$2 AND state='pending'`, requesterID, addresseeID)
 	if err != nil {
 		return "", err
 	}
 	if tag.RowsAffected() == 1 {
-		return Accepted, nil
+		// The requester is who has been waiting; every surface they use (console
+		// friends servers, the phone) learns of the acceptance through this event.
+		if s.emitter != nil {
+			if err := s.emitter.EmitTx(ctx, tx, "friend_accepted", requesterID, "", addresseeID); err != nil {
+				return "", err
+			}
+		}
+		return Accepted, tx.Commit(ctx)
 	}
 	var state State
 	err = s.pool.QueryRow(ctx, `SELECT state FROM friendships
@@ -179,11 +191,29 @@ func (s *Service) RemoveFriend(ctx context.Context, accountID, otherID string) e
 	if accountID == "" || otherID == "" {
 		return ErrInvalid
 	}
-	_, err := s.pool.Exec(ctx, `UPDATE friendships SET state='removed', updated_at=now()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE friendships SET state='removed', updated_at=now()
 		WHERE state IN ('pending','accepted')
 		AND ((requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1))`,
 		accountID, otherID)
-	return err
+	if err != nil {
+		return err
+	}
+	// Both sides lose a list entry (or a pending request); tell both, each with
+	// the other as subject, so every surface can drop it without a full resync.
+	if tag.RowsAffected() == 1 && s.emitter != nil {
+		if err := s.emitter.EmitTx(ctx, tx, "friend_removed", accountID, "", otherID); err != nil {
+			return err
+		}
+		if err := s.emitter.EmitTx(ctx, tx, "friend_removed", otherID, "", accountID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 // ListFriends returns accepted friends with minimal profile projection.
