@@ -68,6 +68,35 @@ func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsReques
 	return s.events.Poll(ctx, req.GetSinceVersion(), req.GetLimit())
 }
 
+// SubscribeAccountEvents is the push form of the poll (universal-social-prd
+// §4a). The unary interceptor does not cover streams, so the handler checks
+// the credentials itself.
+func (s *Server) SubscribeAccountEvents(req *accountv1.SubscribeAccountEventsRequest, stream accountv1.Events_SubscribeAccountEventsServer) error {
+	ctx := stream.Context()
+	if err := s.authorize(ctx); err != nil {
+		return err
+	}
+	return s.events.Subscribe(ctx, req.GetSinceVersion(), func(ev *accountv1.InvalidationEvent) error {
+		return stream.Send(ev)
+	})
+}
+
+// EmitEvent places an internal service's fact on the universal stream. Same
+// credentials as every other internal RPC.
+func (s *Server) EmitEvent(ctx context.Context, req *accountv1.EmitEventRequest) (*accountv1.EmitEventResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	if req.GetType() == "" || req.GetAccountId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "type and account_id are required")
+	}
+	ev, err := s.events.EmitEvent(ctx, req.GetType(), req.GetAccountId(), req.GetNamespace(), req.GetSubjectId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	return &accountv1.EmitEventResponse{Event: ev}, nil
+}
+
 // NodeAuth resolves a presented credential to a federation node id.
 type NodeAuth interface {
 	Authenticate(ctx context.Context, key string) (string, bool)

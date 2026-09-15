@@ -74,7 +74,9 @@ func (s *Service) Reserve(ctx context.Context, accountID, namespace, subjectID, 
 	l, err := queryOne(ctx, tx, `SELECT id, account_id, namespace, subject_id, state
 		FROM adapter_links WHERE namespace=$1 AND subject_id=$2 FOR UPDATE`, namespace, subjectID)
 	switch {
-	case errors.Is(err, pgx.ErrNoRows):
+	case errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrNotFound):
+		// No claim yet — insert. (queryOne translates pgx.ErrNoRows to
+		// ErrNotFound for callers that probe; this is the caller that creates.)
 		l = &Link{ID: newUUID(), AccountID: accountID, Namespace: namespace, SubjectID: subjectID, State: Pending}
 		if _, err := tx.Exec(ctx, `INSERT INTO adapter_links (id, account_id, namespace, subject_id, state, idempotency_key)
 			VALUES ($1,$2,$3,$4,$5,$6)`, l.ID, l.AccountID, l.Namespace, l.SubjectID, string(Pending), idempotencyKey); err != nil {
@@ -221,6 +223,13 @@ func queryOne(ctx context.Context, q interface {
 	var l Link
 	err := q.QueryRow(ctx, sql, args...).Scan(&l.ID, &l.AccountID, &l.Namespace, &l.SubjectID, &l.State)
 	if err != nil {
+		// A subject that simply has no link yet is a lookup miss, not an
+		// internal error: adapters probe for subjects that may not exist (a
+		// battlenet link before first login, a friend whose account went
+		// away), and leaking pgx.ErrNoRows mapped those to 500s.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 	return &l, nil
