@@ -41,11 +41,18 @@ type Service struct {
 
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool, hub: newHub()} }
 
-// Emit records one event on its own transaction.
+// Emit records one event on its own transaction. EmitTx's wake fires before
+// the commit, so a subscriber woken by it can re-poll too early and wait for
+// the safety tick; owning the transaction here, Emit wakes again once the
+// event is visible.
 func (s *Service) Emit(ctx context.Context, typ, accountID, namespace, subjectID string) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	if err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		return s.EmitTx(ctx, tx, typ, accountID, namespace, subjectID)
-	})
+	}); err != nil {
+		return err
+	}
+	s.hub.wake()
+	return nil
 }
 
 // EmitEvent records one event from an internal service (chat announces
