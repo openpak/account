@@ -3,12 +3,14 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
-## Unreleased
+## v0.9.2 — 2026-09-19
 
 - Emails in the website's languages: verification, email change (new and old address) and
   password reset follow the request's `Accept-Language` (German, French, Brazilian
   Portuguese, Italian, Spanish; English otherwise) — `internal/mailtext`. The website sends
   the page language; console registrations over gRPC stay English.
+
+## v0.9.0 — 2026-09-19
 
 Website contracts (branch `contracts-2026-09-19`):
 
