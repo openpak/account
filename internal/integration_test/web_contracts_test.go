@@ -230,3 +230,71 @@ func TestEmailChange(t *testing.T) {
 		t.Fatalf("form post applies it: %+v", a)
 	}
 }
+
+// CR-4: the session says who it belongs to; login says it too.
+func TestWhoami(t *testing.T) {
+	ident, h, _ := webEnv(t)
+	ctx := context.Background()
+	acct, verify, err := ident.Register(ctx, "Who@Example.com", "correct horse battery", "Who Am I")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ := call(t, h, "GET", "/v1/whoami", "", ""); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous: %d", rec.Code)
+	}
+	rec, body := call(t, h, "POST", "/v1/login", "", `{"email":"who@example.com","password":"correct horse battery"}`)
+	if rec.Code != 200 || body["account_id"] != acct.ID {
+		t.Fatalf("login answers the account id: %d %v", rec.Code, body)
+	}
+	var sess string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "openpak_session" {
+			sess = c.Value
+		}
+	}
+
+	rec, body = call(t, h, "GET", "/v1/whoami", sess, "")
+	want := map[string]any{"account_id": acct.ID, "email": "Who@Example.com", "display_name": "Who Am I",
+		"status": "active", "email_verified": false, "two_factor_enabled": false}
+	if rec.Code != 200 {
+		t.Fatalf("whoami: %d %v", rec.Code, body)
+	}
+	for k, v := range want {
+		if body[k] != v {
+			t.Fatalf("whoami[%s] = %v, want %v (%v)", k, body[k], v, body)
+		}
+	}
+	// The same session as a bearer token, for server-side callers.
+	req := httptest.NewRequest("GET", "/v1/whoami", nil)
+	req.Header.Set("Authorization", "Bearer "+sess)
+	bearer := httptest.NewRecorder()
+	h.ServeHTTP(bearer, req)
+	if bearer.Code != 200 || !strings.Contains(bearer.Body.String(), acct.ID) {
+		t.Fatalf("bearer whoami: %d %s", bearer.Code, bearer.Body.String())
+	}
+	req = httptest.NewRequest("GET", "/v1/whoami", nil)
+	req.Header.Set("Authorization", "Bearer not-a-session")
+	bad := httptest.NewRecorder()
+	h.ServeHTTP(bad, req)
+	if bad.Code != http.StatusUnauthorized {
+		t.Fatalf("bad bearer: %d", bad.Code)
+	}
+
+	if err := ident.VerifyEmail(ctx, verify); err != nil {
+		t.Fatal(err)
+	}
+	if _, body = call(t, h, "GET", "/v1/whoami", sess, ""); body["email_verified"] != true {
+		t.Fatalf("verified: %v", body)
+	}
+	// Logout by bearer kills the session.
+	req = httptest.NewRequest("POST", "/v1/logout", nil)
+	req.Header.Set("Authorization", "Bearer "+sess)
+	out := httptest.NewRecorder()
+	h.ServeHTTP(out, req)
+	if out.Code != 200 {
+		t.Fatalf("bearer logout: %d", out.Code)
+	}
+	if rec, _ := call(t, h, "GET", "/v1/whoami", sess, ""); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("whoami after logout: %d", rec.Code)
+	}
+}

@@ -46,6 +46,7 @@ func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string)
 	s.mux.HandleFunc("POST /v1/2fa/enable", s.auth(s.handle2FAEnable))
 	s.mux.HandleFunc("POST /v1/2fa/disable", s.auth(s.handle2FADisable))
 	s.mux.HandleFunc("POST /v1/logout", s.auth(s.handleLogout))
+	s.mux.HandleFunc("GET /v1/whoami", s.auth(s.handleWhoami))
 	s.mux.HandleFunc("GET /v1/sessions", s.auth(s.handleListSessions))
 	s.mux.HandleFunc("DELETE /v1/sessions/{id}", s.auth(s.handleRevokeSession))
 	s.mux.HandleFunc("POST /v1/change-password", s.auth(s.handleChangePassword))
@@ -73,14 +74,28 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // sessionCookieName keeps web sessions in a Secure, HttpOnly, SameSite=Lax cookie.
 const sessionCookieName = "openpak_session"
 
+// sessionToken is the web session a request carries: the cookie, or the same
+// token as "Authorization: Bearer <token>" for server-side callers (the
+// website holds the core session it created at sign-in).
+func sessionToken(r *http.Request) string {
+	if c, err := r.Cookie(sessionCookieName); err == nil && c.Value != "" {
+		return c.Value
+	}
+	const prefix = "Bearer "
+	if h := r.Header.Get("Authorization"); len(h) > len(prefix) && strings.EqualFold(h[:len(prefix)], prefix) {
+		return strings.TrimSpace(h[len(prefix):])
+	}
+	return ""
+}
+
 func (s *Server) auth(next func(http.ResponseWriter, *http.Request, *identity.Account)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		c, err := r.Cookie(sessionCookieName)
-		if err != nil || c.Value == "" {
+		token := sessionToken(r)
+		if token == "" {
 			writeError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
-		acct, err := s.identity.SessionAccount(r.Context(), c.Value)
+		acct, err := s.identity.SessionAccount(r.Context(), token)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "invalid or expired session")
 			return
@@ -286,7 +301,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	token, challenge, _, err := s.identity.BeginLogin(r.Context(), req.Email, req.Password)
+	token, challenge, acct, err := s.identity.BeginLogin(r.Context(), req.Email, req.Password)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
@@ -297,7 +312,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setSessionCookie(w, token)
-	writeJSON(w, http.StatusOK, map[string]string{"message": "signed in"})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "signed in", "account_id": acct.ID})
 }
 
 func setSessionCookie(w http.ResponseWriter, token string) {
@@ -323,11 +338,11 @@ func (s *Server) handleLogin2FA(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	token, _, err := s.identity.CompleteLogin(r.Context(), req.Challenge, req.Code, req.RecoveryCode)
+	token, acct, err := s.identity.CompleteLogin(r.Context(), req.Challenge, req.Code, req.RecoveryCode)
 	switch {
 	case err == nil:
 		setSessionCookie(w, token)
-		writeJSON(w, http.StatusOK, map[string]string{"message": "signed in"})
+		writeJSON(w, http.StatusOK, map[string]string{"message": "signed in", "account_id": acct.ID})
 	case errors.Is(err, identity.ErrTokenInvalid):
 		writeError(w, http.StatusUnauthorized, "sign-in challenge is invalid or expired; sign in again")
 	default:
@@ -406,10 +421,9 @@ func (s *Server) handle2FADisable(w http.ResponseWriter, r *http.Request, acct *
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
-	c, err := r.Cookie(sessionCookieName)
-	if err == nil && c.Value != "" {
+	if token := sessionToken(r); token != "" {
 		// Revoke in storage BEFORE reporting success (review P1 #2).
-		if err := s.identity.RevokeByToken(r.Context(), c.Value); err != nil {
+		if err := s.identity.RevokeByToken(r.Context(), token); err != nil {
 			writeError(w, http.StatusInternalServerError, "could not sign out; session still active")
 			return
 		}
@@ -417,6 +431,29 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request, acct *iden
 	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1,
 		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	writeJSON(w, http.StatusOK, map[string]string{"message": "signed out"})
+}
+
+// handleWhoami answers who the session belongs to (website contract request
+// CR-4), so a caller that just signed someone in never has to re-verify the
+// password to learn the account id.
+func (s *Server) handleWhoami(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
+	twoFA, err := s.identity.TwoFactorEnabled(r.Context(), acct.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	status := string(acct.Status)
+	if acct.Status == identity.StatusDeletionPending {
+		status = "deletion-pending"
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"account_id":         acct.ID,
+		"email":              acct.Email,
+		"display_name":       acct.DisplayName,
+		"status":             status,
+		"email_verified":     acct.EmailVerified,
+		"two_factor_enabled": twoFA,
+	})
 }
 
 func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
@@ -567,10 +604,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, ac
 		return
 	}
 	// Keep the caller's own session alive; every other one is revoked inside ChangePassword.
-	keep := ""
-	if c, err := r.Cookie(sessionCookieName); err == nil {
-		keep = c.Value
-	}
+	keep := sessionToken(r)
 	if err := s.identity.ChangePassword(r.Context(), acct.ID, req.Current, req.New, keep); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

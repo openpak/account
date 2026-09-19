@@ -118,8 +118,11 @@ func TestTwoFactor(t *testing.T) {
 	if rec.Code != 200 || sessionCookie(rec) == "" {
 		t.Fatalf("login/2fa: %d %v", rec.Code, body)
 	}
-	if acct, err := ident.SessionAccount(ctx, sessionCookie(rec)); err != nil || acct.ID != id {
-		t.Fatalf("2fa session: %v", err)
+	if acct, err := ident.SessionAccount(ctx, sessionCookie(rec)); err != nil || acct.ID != id || body["account_id"] != id {
+		t.Fatalf("2fa session: %v %v", err, body)
+	}
+	if _, who := call(t, h, "GET", "/v1/whoami", sessionCookie(rec), ""); who["two_factor_enabled"] != true {
+		t.Fatalf("whoami after enrolment: %v", who)
 	}
 	if rec, _ := call(t, h, "POST", "/v1/login/2fa", "", `{"challenge":"`+ch+`","recovery_code":"`+recovery[0]+`"}`); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("challenge is single-use: %d", rec.Code)
