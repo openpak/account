@@ -15,7 +15,14 @@ import (
 	"openpak/account/internal/storage"
 )
 
-const testDBURL = "postgres://postgres:test@127.0.0.1:54329/account_test?sslmode=disable"
+// testDBURL is the throwaway database the tests drop and recreate. Override it
+// with ACCOUNT_TEST_DATABASE_URL when 54329 is taken by something else.
+var testDBURL = func() string {
+	if v := os.Getenv("ACCOUNT_TEST_DATABASE_URL"); v != "" {
+		return v
+	}
+	return "postgres://postgres:test@127.0.0.1:54329/account_test?sslmode=disable"
+}()
 
 func newEnv(t *testing.T) (*identity.Service, *links.Service) {
 	t.Helper()
