@@ -636,6 +636,25 @@ func (s *Service) ResendVerificationIfUnverified(ctx context.Context, email, pas
 	if !comparePassword(passwordHash, s.pepper, password) {
 		return "" // credential proof required to trigger email delivery
 	}
+	return s.reissueVerification(ctx, accountID)
+}
+
+// ResendVerificationForAccount re-issues the verification token for a
+// signed-in account (POST /v1/verify/resend). Returns "" when the account is
+// already verified, not active, or inside the resend throttle; callers answer
+// the same either way.
+func (s *Service) ResendVerificationForAccount(ctx context.Context, accountID string) string {
+	var verifiedAt *time.Time
+	if err := s.pool.QueryRow(ctx, `SELECT email_verified_at FROM accounts WHERE id=$1 AND status='active'`,
+		accountID).Scan(&verifiedAt); err != nil || verifiedAt != nil {
+		return ""
+	}
+	return s.reissueVerification(ctx, accountID)
+}
+
+// reissueVerification is the shared resend path: throttled, and it leaves
+// exactly one working link.
+func (s *Service) reissueVerification(ctx context.Context, accountID string) string {
 	// Throttle: at most one resend per 10 minutes even with valid creds.
 	// Only resend-issued tokens count — the initial signup token must not
 	// block the first repair (the failed-delivery case).

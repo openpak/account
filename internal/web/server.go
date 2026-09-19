@@ -36,6 +36,7 @@ func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string)
 	s := &Server{identity: ident, mailer: m, baseURL: baseURL, siteBaseURL: siteBaseURL, mux: http.NewServeMux()}
 	s.mux.HandleFunc("POST /v1/register", s.handleRegister)
 	s.mux.HandleFunc("GET /v1/verify", s.handleVerify)
+	s.mux.HandleFunc("POST /v1/verify/resend", s.auth(s.handleVerifyResend))
 	s.mux.HandleFunc("POST /v1/login", s.handleLogin)
 	s.mux.HandleFunc("POST /v1/logout", s.auth(s.handleLogout))
 	s.mux.HandleFunc("GET /v1/sessions", s.auth(s.handleListSessions))
@@ -152,6 +153,20 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "email verified"})
+}
+
+// resendMessage is the only answer POST /v1/verify/resend gives: sent,
+// throttled, already verified and mail failure all look the same.
+const resendMessage = "if the address still needs confirming, a new link has been sent"
+
+// handleVerifyResend mails a fresh verification link to the signed-in
+// account's address. Throttled to one per 10 minutes per account (the same
+// throttle the register-retry repair path uses); the old link stops working.
+func (s *Server) handleVerifyResend(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
+	if token := s.identity.ResendVerificationForAccount(r.Context(), acct.ID); token != "" && s.mailer != nil {
+		_ = s.sendVerificationEmail(acct.Email, acct.DisplayName, token)
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": resendMessage})
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
