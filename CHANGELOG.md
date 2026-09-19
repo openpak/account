@@ -5,6 +5,20 @@ of truth; this file is the readable summary.
 
 ## Unreleased
 
+Website contracts (branch `contracts-2026-09-19`):
+
+- `GET /v1/whoami`; sessions accepted as `Authorization: Bearer`; login answers `account_id` (CR-4)
+- Moderation service: `SearchAccounts`, audited `SetAccountBanned`, reports queue `FileReport`/`ListReports`/`ResolveReport` (CR-5, CR-6); migration `0013`
+- Links: adapter-published public codes, `SetLinkPublicCode`/`ListAccountLinks`/`GetLinkByPublicCode` (CR-3); migration `0014`
+- Media service: avatars in Postgres, `PutAvatar`/`GetAvatar`/`DeleteAvatar` (CR-2); migration `0015`
+- `Social.ListBlocks`
+- `POST /v1/verify/resend`
+- Email change: `POST /v1/email/change`, `POST /v1/email/confirm`, event `email_changed`; migration `0016`
+- Two-factor authentication (TOTP + recovery codes), `/v1/2fa/*`, `/v1/login/2fa`, `Identity.VerifySecondFactor`; password-only gRPC checks fail closed for 2FA accounts; new env `ACCOUNT_TOTP_KEY`; migration `0017`
+- Unbanning no longer revives a deletion-pending account
+- Events: `Emit` wakes subscribers after commit (fixes a flaky subscribe test)
+- Tests: `ACCOUNT_TEST_DATABASE_URL` overrides the throwaway database
+
 - release: job-scoped registry auth file [b76de6b]
 - release: build on the self-hosted runner with podman; private-repo minutes are metered [6f8278e]
 
