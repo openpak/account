@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -387,6 +389,40 @@ func (s *Service) Block(ctx context.Context, blockerID, blockedID string) error 
 	}
 	return nil
 }
+
+// BlockedAccount is one entry of an account's block list.
+type BlockedAccount struct {
+	AccountID   string
+	DisplayName string
+	CreatedAt   time.Time
+}
+
+// ListBlocks returns the accounts accountID has blocked, newest block first.
+// Only the blocker's own list: who blocked you is never answered here.
+// Deleted accounts drop out of the list.
+func (s *Service) ListBlocks(ctx context.Context, accountID string) ([]BlockedAccount, error) {
+	if !uuidRe.MatchString(accountID) {
+		return nil, ErrInvalid
+	}
+	rows, err := s.pool.Query(ctx, `SELECT b.blocked_id, acc.display_name, b.created_at
+		FROM account_blocks b JOIN accounts acc ON acc.id = b.blocked_id
+		WHERE b.blocker_id=$1 AND acc.status <> 'deleted' ORDER BY b.created_at DESC`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []BlockedAccount
+	for rows.Next() {
+		var b BlockedAccount
+		if err := rows.Scan(&b.AccountID, &b.DisplayName, &b.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // Unblock removes a directional block. Idempotent.
 func (s *Service) Unblock(ctx context.Context, blockerID, blockedID string) error {

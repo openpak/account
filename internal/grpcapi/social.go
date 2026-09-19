@@ -192,3 +192,19 @@ func (s *Server) ListOutgoingRequests(ctx context.Context, req *accountv1.ListOu
 	}
 	return resp, nil
 }
+
+func (s *Server) ListBlocks(ctx context.Context, req *accountv1.ListBlocksRequest) (*accountv1.ListBlocksResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	blocked, err := s.social.ListBlocks(ctx, req.GetAccountId())
+	if err != nil {
+		return nil, mapSocialErr(err)
+	}
+	resp := &accountv1.ListBlocksResponse{}
+	for _, b := range blocked {
+		resp.Blocked = append(resp.Blocked, &accountv1.BlockedAccount{
+			AccountId: b.AccountID, DisplayName: b.DisplayName, BlockedAtUnix: b.CreatedAt.Unix()})
+	}
+	return resp, nil
+}
