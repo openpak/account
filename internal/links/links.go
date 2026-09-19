@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,6 +18,8 @@ var (
 	ErrConflict       = errors.New("links: conflicting claim or state")
 	ErrNotPending     = errors.New("links: reservation not pending")
 	ErrAccountUnknown = errors.New("links: account unknown")
+	ErrNotActive      = errors.New("links: link not active")
+	ErrInvalid        = errors.New("links: invalid public code")
 )
 
 type State string
@@ -33,6 +37,9 @@ type Link struct {
 	Namespace string
 	SubjectID string
 	State     State
+	// PublicCode is the adapter-published human code (e.g. the Switch friend
+	// code), display form; empty until the adapter publishes one.
+	PublicCode string
 }
 
 // Emitter records durable invalidation events inside the caller's
@@ -71,7 +78,7 @@ func (s *Service) Reserve(ctx context.Context, accountID, namespace, subjectID, 
 		return nil, ErrAccountUnknown
 	}
 
-	l, err := queryOne(ctx, tx, `SELECT id, account_id, namespace, subject_id, state
+	l, err := queryOne(ctx, tx, `SELECT id, account_id, namespace, subject_id, state, public_code
 		FROM adapter_links WHERE namespace=$1 AND subject_id=$2 FOR UPDATE`, namespace, subjectID)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrNotFound):
@@ -164,7 +171,9 @@ func (s *Service) Unlink(ctx context.Context, linkID, idempotencyKey string) (St
 					return err
 				}
 			}
-			if _, err := tx.Exec(ctx, `UPDATE adapter_links SET state='revoked', updated_at=now()
+			// The published code goes with the link: a relink later must not
+			// resurrect a code the adapter may have handed to someone else.
+			if _, err := tx.Exec(ctx, `UPDATE adapter_links SET state='revoked', public_code='', public_code_key='', updated_at=now()
 				WHERE id=$1 AND state='revoking'`, linkID); err != nil {
 				return err
 			}
@@ -194,13 +203,13 @@ func (s *Service) Unlink(ctx context.Context, linkID, idempotencyKey string) (St
 
 // GetBySubject returns the link for a namespace/subject, regardless of state.
 func (s *Service) GetBySubject(ctx context.Context, namespace, subjectID string) (*Link, error) {
-	return queryOne(ctx, s.pool, `SELECT id, account_id, namespace, subject_id, state
+	return queryOne(ctx, s.pool, `SELECT id, account_id, namespace, subject_id, state, public_code
 		FROM adapter_links WHERE namespace=$1 AND subject_id=$2`, namespace, subjectID)
 }
 
 // ListByAccount returns all links for an account.
 func (s *Service) ListByAccount(ctx context.Context, accountID string) ([]*Link, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id, account_id, namespace, subject_id, state
+	rows, err := s.pool.Query(ctx, `SELECT id, account_id, namespace, subject_id, state, public_code
 		FROM adapter_links WHERE account_id=$1 ORDER BY created_at`, accountID)
 	if err != nil {
 		return nil, err
@@ -209,7 +218,7 @@ func (s *Service) ListByAccount(ctx context.Context, accountID string) ([]*Link,
 	var out []*Link
 	for rows.Next() {
 		var l Link
-		if err := rows.Scan(&l.ID, &l.AccountID, &l.Namespace, &l.SubjectID, &l.State); err != nil {
+		if err := rows.Scan(&l.ID, &l.AccountID, &l.Namespace, &l.SubjectID, &l.State, &l.PublicCode); err != nil {
 			return nil, err
 		}
 		out = append(out, &l)
@@ -217,11 +226,86 @@ func (s *Service) ListByAccount(ctx context.Context, accountID string) ([]*Link,
 	return out, rows.Err()
 }
 
+// MaxPublicCode bounds a published code's display form.
+const MaxPublicCode = 64
+
+// CodeKey is the form public codes are compared on when the publisher did not
+// declare one: letters and digits only, lower-cased. "SW-1234-5678-9012",
+// "sw 1234 5678 9012" and "sw123456789012" share a key.
+func CodeKey(code string) string {
+	var b strings.Builder
+	for _, c := range strings.ToLower(code) {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
+
+// SetPublicCode publishes the adapter's human code on an active link, and
+// replaces whatever was published before (a regenerated friend code retires
+// the old one in the same statement). key is the adapter's canonical lookup
+// form; empty means CodeKey(code). An empty code unpublishes. A code another
+// active link in the namespace already holds is ErrConflict.
+func (s *Service) SetPublicCode(ctx context.Context, linkID, code, key string) error {
+	code = strings.TrimSpace(code)
+	if len(code) > MaxPublicCode || strings.ContainsFunc(code, unicode.IsControl) {
+		return ErrInvalid
+	}
+	if key = CodeKey(key); key == "" {
+		key = CodeKey(code)
+	}
+	if code != "" && key == "" {
+		return ErrInvalid
+	}
+	if code == "" {
+		key = ""
+	}
+	tag, err := s.pool.Exec(ctx, `UPDATE adapter_links SET public_code=$2, public_code_key=$3, updated_at=now()
+		WHERE id=$1 AND state='active'`, linkID, code, key)
+	if err != nil {
+		if strings.Contains(err.Error(), "SQLSTATE 23505") {
+			return ErrConflict
+		}
+		if strings.Contains(err.Error(), "SQLSTATE 22P02") { // not a uuid
+			return ErrNotFound
+		}
+		return err
+	}
+	if tag.RowsAffected() == 1 {
+		return nil
+	}
+	var state State
+	err = s.pool.QueryRow(ctx, `SELECT state FROM adapter_links WHERE id=$1`, linkID).Scan(&state)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	return ErrNotActive
+}
+
+// GetByPublicCode resolves a code, as a person typed it, to the active link
+// that published it. The typed form is compared by CodeKey against both the
+// declared key and the display form, so "SW-1234-5678-9012" and, where the
+// adapter declared the digits as its key, "123456789012" both resolve.
+func (s *Service) GetByPublicCode(ctx context.Context, namespace, code string) (*Link, error) {
+	k := CodeKey(code)
+	if namespace == "" || k == "" {
+		return nil, ErrNotFound
+	}
+	return queryOne(ctx, s.pool, `SELECT id, account_id, namespace, subject_id, state, public_code
+		FROM adapter_links WHERE namespace=$1 AND state='active' AND public_code <> ''
+		AND (public_code_key=$2 OR lower(regexp_replace(public_code, '[^0-9A-Za-z]', '', 'g'))=$2)
+		ORDER BY (public_code_key=$2) DESC LIMIT 1`, namespace, k)
+}
+
 func queryOne(ctx context.Context, q interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }, sql string, args ...any) (*Link, error) {
 	var l Link
-	err := q.QueryRow(ctx, sql, args...).Scan(&l.ID, &l.AccountID, &l.Namespace, &l.SubjectID, &l.State)
+	err := q.QueryRow(ctx, sql, args...).Scan(&l.ID, &l.AccountID, &l.Namespace, &l.SubjectID, &l.State, &l.PublicCode)
 	if err != nil {
 		// A subject that simply has no link yet is a lookup miss, not an
 		// internal error: adapters probe for subjects that may not exist (a

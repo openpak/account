@@ -114,6 +114,47 @@ service Links {
   // adapter retries never mint a second subject (PRD SW-01). NotFound when
   // the account has no active link in that namespace.
   rpc GetActiveLinkByAccount(GetActiveLinkByAccountRequest) returns (GetLinkBySubjectResponse);
+  // Publish the adapter-minted human code (e.g. the Switch friend code) on an
+  // active link; replaces the previous one, empty unpublishes. The core
+  // stores it and never mints or interprets it. AlreadyExists when another
+  // active link in the namespace holds the same code; FailedPrecondition when
+  // the link is not active. Unlinking clears it. See docs/public-codes.md.
+  rpc SetLinkPublicCode(SetLinkPublicCodeRequest) returns (SetLinkPublicCodeResponse);
+  // Every active link of an account (optionally one namespace), with subject
+  // and published code: the read side for third-party surfaces.
+  rpc ListAccountLinks(ListAccountLinksRequest) returns (ListAccountLinksResponse);
+  // Resolve a code as a person typed it to the active link that published it.
+  // NotFound when no active link in the namespace holds it.
+  rpc GetLinkByPublicCode(GetLinkByPublicCodeRequest) returns (GetLinkBySubjectResponse);
+}
+
+message SetLinkPublicCodeRequest {
+  string link_id = 1;
+  string public_code = 2; // display form, e.g. "SW-1234-5678-9012"; up to 64 characters
+  // Optional canonical lookup form, e.g. "123456789012". Reduced to lower-case
+  // letters and digits; empty means the display form reduced the same way.
+  string lookup_key = 3;
+}
+
+message SetLinkPublicCodeResponse {}
+
+message ListAccountLinksRequest {
+  string account_id = 1;
+  string namespace = 2; // optional filter
+}
+
+message AccountLink {
+  string link_id = 1;
+  string namespace = 2;
+  string subject_id = 3;
+  string public_code = 4; // empty until the adapter publishes one
+}
+
+message ListAccountLinksResponse { repeated AccountLink links = 1; }
+
+message GetLinkByPublicCodeRequest {
+  string namespace = 1;
+  string public_code = 2; // as typed: case, dashes and spaces are ignored
 }
 
 message ReserveLinkRequest {
@@ -156,9 +197,11 @@ message GetLinkBySubjectResponse {
   string link_id = 1;
   string account_id = 2;
   LinkState state = 3;
-  // Populated only by GetActiveLinkByAccount (the subject is the lookup key
-  // on GetLinkBySubject).
+  // Populated by GetActiveLinkByAccount and GetLinkByPublicCode (the subject
+  // is the lookup key on GetLinkBySubject).
   string subject_id = 4;
+  // The adapter-published human code for this link, if any (every call).
+  string public_code = 5;
 }
 
 enum LinkState {

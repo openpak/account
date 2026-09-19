@@ -5,6 +5,7 @@ package grpcapi
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -287,7 +288,7 @@ func (s *Server) GetLinkBySubject(ctx context.Context, req *accountv1.GetLinkByS
 		}
 		return nil, mapLinkErr(err)
 	}
-	return &accountv1.GetLinkBySubjectResponse{LinkId: l.ID, AccountId: l.AccountID, State: linkState(l.State)}, nil
+	return &accountv1.GetLinkBySubjectResponse{LinkId: l.ID, AccountId: l.AccountID, State: linkState(l.State), PublicCode: l.PublicCode}, nil
 }
 
 // GetActiveLinkByAccount resolves the account's active link in one adapter
@@ -308,15 +309,73 @@ func (s *Server) GetActiveLinkByAccount(ctx context.Context, req *accountv1.GetA
 		if l.Namespace == req.GetNamespace() && l.State == links.Active {
 			return &accountv1.GetLinkBySubjectResponse{
 				LinkId: l.ID, AccountId: l.AccountID, SubjectId: l.SubjectID,
-				State: linkState(l.State),
+				State: linkState(l.State), PublicCode: l.PublicCode,
 			}, nil
 		}
 	}
 	return nil, status.Error(codes.NotFound, "no active link for account in namespace")
 }
 
+// SetLinkPublicCode publishes the adapter's human code on an active link
+// (CR-3; docs/public-codes.md).
+func (s *Server) SetLinkPublicCode(ctx context.Context, req *accountv1.SetLinkPublicCodeRequest) (*accountv1.SetLinkPublicCodeResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	if req.GetLinkId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "link_id is required")
+	}
+	if err := s.links.SetPublicCode(ctx, req.GetLinkId(), req.GetPublicCode(), req.GetLookupKey()); err != nil {
+		return nil, mapLinkErr(err)
+	}
+	return &accountv1.SetLinkPublicCodeResponse{}, nil
+}
+
+// ListAccountLinks is every active link of an account with its subject and
+// published code, for surfaces that show them.
+func (s *Server) ListAccountLinks(ctx context.Context, req *accountv1.ListAccountLinksRequest) (*accountv1.ListAccountLinksResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	if req.GetAccountId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "account_id is required")
+	}
+	all, err := s.links.ListByAccount(ctx, req.GetAccountId())
+	if err != nil {
+		if strings.Contains(err.Error(), "SQLSTATE 22P02") {
+			return nil, status.Error(codes.InvalidArgument, "account_id is not an id")
+		}
+		return nil, mapLinkErr(err)
+	}
+	resp := &accountv1.ListAccountLinksResponse{}
+	for _, l := range all {
+		if l.State != links.Active || (req.GetNamespace() != "" && l.Namespace != req.GetNamespace()) {
+			continue
+		}
+		resp.Links = append(resp.Links, &accountv1.AccountLink{
+			LinkId: l.ID, Namespace: l.Namespace, SubjectId: l.SubjectID, PublicCode: l.PublicCode})
+	}
+	return resp, nil
+}
+
+func (s *Server) GetLinkByPublicCode(ctx context.Context, req *accountv1.GetLinkByPublicCodeRequest) (*accountv1.GetLinkBySubjectResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	l, err := s.links.GetByPublicCode(ctx, req.GetNamespace(), req.GetPublicCode())
+	if err != nil {
+		return nil, mapLinkErr(err)
+	}
+	return &accountv1.GetLinkBySubjectResponse{LinkId: l.ID, AccountId: l.AccountID, SubjectId: l.SubjectID,
+		State: linkState(l.State), PublicCode: l.PublicCode}, nil
+}
+
 func mapLinkErr(err error) error {
 	switch {
+	case errors.Is(err, links.ErrNotActive):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, links.ErrInvalid):
+		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, links.ErrConflict):
 		return status.Error(codes.AlreadyExists, err.Error())
 	case errors.Is(err, links.ErrNotPending):
