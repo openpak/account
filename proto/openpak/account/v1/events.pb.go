@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v7.36.1
-// source: proto/openpak/account/v1/events.proto
+// source: openpak/account/v1/events.proto
 
 package accountv1
 
@@ -30,7 +30,7 @@ type SubscribeAccountEventsRequest struct {
 
 func (x *SubscribeAccountEventsRequest) Reset() {
 	*x = SubscribeAccountEventsRequest{}
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[0]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +42,7 @@ func (x *SubscribeAccountEventsRequest) String() string {
 func (*SubscribeAccountEventsRequest) ProtoMessage() {}
 
 func (x *SubscribeAccountEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[0]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +55,7 @@ func (x *SubscribeAccountEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeAccountEventsRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeAccountEventsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_events_proto_rawDescGZIP(), []int{0}
+	return file_openpak_account_v1_events_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SubscribeAccountEventsRequest) GetSinceVersion() uint64 {
@@ -77,7 +77,7 @@ type EmitEventRequest struct {
 
 func (x *EmitEventRequest) Reset() {
 	*x = EmitEventRequest{}
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[1]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -89,7 +89,7 @@ func (x *EmitEventRequest) String() string {
 func (*EmitEventRequest) ProtoMessage() {}
 
 func (x *EmitEventRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[1]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -102,7 +102,7 @@ func (x *EmitEventRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmitEventRequest.ProtoReflect.Descriptor instead.
 func (*EmitEventRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_events_proto_rawDescGZIP(), []int{1}
+	return file_openpak_account_v1_events_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *EmitEventRequest) GetType() string {
@@ -142,7 +142,7 @@ type EmitEventResponse struct {
 
 func (x *EmitEventResponse) Reset() {
 	*x = EmitEventResponse{}
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[2]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -154,7 +154,7 @@ func (x *EmitEventResponse) String() string {
 func (*EmitEventResponse) ProtoMessage() {}
 
 func (x *EmitEventResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[2]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -167,7 +167,7 @@ func (x *EmitEventResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmitEventResponse.ProtoReflect.Descriptor instead.
 func (*EmitEventResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_events_proto_rawDescGZIP(), []int{2}
+	return file_openpak_account_v1_events_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *EmitEventResponse) GetEvent() *InvalidationEvent {
@@ -187,7 +187,7 @@ type PollEventsRequest struct {
 
 func (x *PollEventsRequest) Reset() {
 	*x = PollEventsRequest{}
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[3]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -199,7 +199,7 @@ func (x *PollEventsRequest) String() string {
 func (*PollEventsRequest) ProtoMessage() {}
 
 func (x *PollEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[3]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -212,7 +212,7 @@ func (x *PollEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollEventsRequest.ProtoReflect.Descriptor instead.
 func (*PollEventsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_events_proto_rawDescGZIP(), []int{3}
+	return file_openpak_account_v1_events_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PollEventsRequest) GetSinceVersion() uint64 {
@@ -239,7 +239,7 @@ type PollEventsResponse struct {
 
 func (x *PollEventsResponse) Reset() {
 	*x = PollEventsResponse{}
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[4]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -251,7 +251,7 @@ func (x *PollEventsResponse) String() string {
 func (*PollEventsResponse) ProtoMessage() {}
 
 func (x *PollEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[4]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -264,7 +264,7 @@ func (x *PollEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollEventsResponse.ProtoReflect.Descriptor instead.
 func (*PollEventsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_events_proto_rawDescGZIP(), []int{4}
+	return file_openpak_account_v1_events_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PollEventsResponse) GetEvents() []*InvalidationEvent {
@@ -285,7 +285,7 @@ type InvalidationEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Version       uint64                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	EventId       string                 `protobuf:"bytes,2,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"` // stable ID for dedup
-	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`                      // account_banned | account_unbanned | link_unlinked | account_delete_started | account_deleted | credential_revoked | friend_requested | friend_accepted | friend_removed | message (account = who must hear it, subject = the other party or, for message, the chat message id)
+	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`                      // account_banned | account_unbanned | link_unlinked | account_delete_started | account_deleted | credential_revoked | friend_requested | friend_accepted | friend_removed | invitation_sent | message | email_changed (account = who must hear it, subject = the other party or, for message, the chat message id; email_changed has no subject: re-read the account)
 	AccountId     string                 `protobuf:"bytes,4,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	Namespace     string                 `protobuf:"bytes,5,opt,name=namespace,proto3" json:"namespace,omitempty"`                  // set when scoped to one adapter link
 	SubjectId     string                 `protobuf:"bytes,6,opt,name=subject_id,json=subjectId,proto3" json:"subject_id,omitempty"` // set when scoped to one adapter link
@@ -296,7 +296,7 @@ type InvalidationEvent struct {
 
 func (x *InvalidationEvent) Reset() {
 	*x = InvalidationEvent{}
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[5]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -308,7 +308,7 @@ func (x *InvalidationEvent) String() string {
 func (*InvalidationEvent) ProtoMessage() {}
 
 func (x *InvalidationEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_openpak_account_v1_events_proto_msgTypes[5]
+	mi := &file_openpak_account_v1_events_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -321,7 +321,7 @@ func (x *InvalidationEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvalidationEvent.ProtoReflect.Descriptor instead.
 func (*InvalidationEvent) Descriptor() ([]byte, []int) {
-	return file_proto_openpak_account_v1_events_proto_rawDescGZIP(), []int{5}
+	return file_openpak_account_v1_events_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *InvalidationEvent) GetVersion() uint64 {
@@ -373,11 +373,11 @@ func (x *InvalidationEvent) GetCreatedAtUnix() int64 {
 	return 0
 }
 
-var File_proto_openpak_account_v1_events_proto protoreflect.FileDescriptor
+var File_openpak_account_v1_events_proto protoreflect.FileDescriptor
 
-const file_proto_openpak_account_v1_events_proto_rawDesc = "" +
+const file_openpak_account_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"%proto/openpak/account/v1/events.proto\x12\x12openpak.account.v1\"D\n" +
+	"\x1fopenpak/account/v1/events.proto\x12\x12openpak.account.v1\"D\n" +
 	"\x1dSubscribeAccountEventsRequest\x12#\n" +
 	"\rsince_version\x18\x01 \x01(\x04R\fsinceVersion\"\x82\x01\n" +
 	"\x10EmitEventRequest\x12\x12\n" +
@@ -413,19 +413,19 @@ const file_proto_openpak_account_v1_events_proto_rawDesc = "" +
 	"\tEmitEvent\x12$.openpak.account.v1.EmitEventRequest\x1a%.openpak.account.v1.EmitEventResponseB4Z2openpak/account/proto/openpak/account/v1;accountv1b\x06proto3"
 
 var (
-	file_proto_openpak_account_v1_events_proto_rawDescOnce sync.Once
-	file_proto_openpak_account_v1_events_proto_rawDescData []byte
+	file_openpak_account_v1_events_proto_rawDescOnce sync.Once
+	file_openpak_account_v1_events_proto_rawDescData []byte
 )
 
-func file_proto_openpak_account_v1_events_proto_rawDescGZIP() []byte {
-	file_proto_openpak_account_v1_events_proto_rawDescOnce.Do(func() {
-		file_proto_openpak_account_v1_events_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_openpak_account_v1_events_proto_rawDesc), len(file_proto_openpak_account_v1_events_proto_rawDesc)))
+func file_openpak_account_v1_events_proto_rawDescGZIP() []byte {
+	file_openpak_account_v1_events_proto_rawDescOnce.Do(func() {
+		file_openpak_account_v1_events_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_openpak_account_v1_events_proto_rawDesc), len(file_openpak_account_v1_events_proto_rawDesc)))
 	})
-	return file_proto_openpak_account_v1_events_proto_rawDescData
+	return file_openpak_account_v1_events_proto_rawDescData
 }
 
-var file_proto_openpak_account_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_proto_openpak_account_v1_events_proto_goTypes = []any{
+var file_openpak_account_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_openpak_account_v1_events_proto_goTypes = []any{
 	(*SubscribeAccountEventsRequest)(nil), // 0: openpak.account.v1.SubscribeAccountEventsRequest
 	(*EmitEventRequest)(nil),              // 1: openpak.account.v1.EmitEventRequest
 	(*EmitEventResponse)(nil),             // 2: openpak.account.v1.EmitEventResponse
@@ -433,7 +433,7 @@ var file_proto_openpak_account_v1_events_proto_goTypes = []any{
 	(*PollEventsResponse)(nil),            // 4: openpak.account.v1.PollEventsResponse
 	(*InvalidationEvent)(nil),             // 5: openpak.account.v1.InvalidationEvent
 }
-var file_proto_openpak_account_v1_events_proto_depIdxs = []int32{
+var file_openpak_account_v1_events_proto_depIdxs = []int32{
 	5, // 0: openpak.account.v1.EmitEventResponse.event:type_name -> openpak.account.v1.InvalidationEvent
 	5, // 1: openpak.account.v1.PollEventsResponse.events:type_name -> openpak.account.v1.InvalidationEvent
 	3, // 2: openpak.account.v1.Events.PollEvents:input_type -> openpak.account.v1.PollEventsRequest
@@ -449,26 +449,26 @@ var file_proto_openpak_account_v1_events_proto_depIdxs = []int32{
 	0, // [0:2] is the sub-list for field type_name
 }
 
-func init() { file_proto_openpak_account_v1_events_proto_init() }
-func file_proto_openpak_account_v1_events_proto_init() {
-	if File_proto_openpak_account_v1_events_proto != nil {
+func init() { file_openpak_account_v1_events_proto_init() }
+func file_openpak_account_v1_events_proto_init() {
+	if File_openpak_account_v1_events_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_openpak_account_v1_events_proto_rawDesc), len(file_proto_openpak_account_v1_events_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_openpak_account_v1_events_proto_rawDesc), len(file_openpak_account_v1_events_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_openpak_account_v1_events_proto_goTypes,
-		DependencyIndexes: file_proto_openpak_account_v1_events_proto_depIdxs,
-		MessageInfos:      file_proto_openpak_account_v1_events_proto_msgTypes,
+		GoTypes:           file_openpak_account_v1_events_proto_goTypes,
+		DependencyIndexes: file_openpak_account_v1_events_proto_depIdxs,
+		MessageInfos:      file_openpak_account_v1_events_proto_msgTypes,
 	}.Build()
-	File_proto_openpak_account_v1_events_proto = out.File
-	file_proto_openpak_account_v1_events_proto_goTypes = nil
-	file_proto_openpak_account_v1_events_proto_depIdxs = nil
+	File_openpak_account_v1_events_proto = out.File
+	file_openpak_account_v1_events_proto_goTypes = nil
+	file_openpak_account_v1_events_proto_depIdxs = nil
 }

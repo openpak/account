@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v7.36.1
-// source: proto/openpak/account/v1/events.proto
+// source: openpak/account/v1/events.proto
 
 package accountv1
 
@@ -221,5 +221,5 @@ var Events_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/openpak/account/v1/events.proto",
+	Metadata: "openpak/account/v1/events.proto",
 }

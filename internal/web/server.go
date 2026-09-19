@@ -37,6 +37,9 @@ func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string)
 	s.mux.HandleFunc("POST /v1/register", s.handleRegister)
 	s.mux.HandleFunc("GET /v1/verify", s.handleVerify)
 	s.mux.HandleFunc("POST /v1/verify/resend", s.auth(s.handleVerifyResend))
+	s.mux.HandleFunc("POST /v1/email/change", s.auth(s.handleEmailChange))
+	s.mux.HandleFunc("POST /v1/email/confirm", s.handleEmailConfirm)
+	s.mux.HandleFunc("GET /v1/email/confirm", s.handleEmailConfirmPage)
 	s.mux.HandleFunc("POST /v1/login", s.handleLogin)
 	s.mux.HandleFunc("POST /v1/logout", s.auth(s.handleLogout))
 	s.mux.HandleFunc("GET /v1/sessions", s.auth(s.handleListSessions))
@@ -167,6 +170,108 @@ func (s *Server) handleVerifyResend(w http.ResponseWriter, r *http.Request, acct
 		_ = s.sendVerificationEmail(acct.Email, acct.DisplayName, token)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": resendMessage})
+}
+
+// emailChangeMessage is the one answer to an accepted change request: the
+// response never says whether the new address belongs to someone else.
+const emailChangeMessage = "if the address can be used, a confirmation link has been sent to it"
+
+// handleEmailChange starts moving the signed-in account to a new address. The
+// password is required (a borrowed session must not be enough to take the
+// account's recovery address). The link goes to the NEW address, a notice to
+// the old one; nothing changes until the link is followed.
+func (s *Server) handleEmailChange(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
+	var req struct {
+		NewEmail string `json:"new_email"`
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	ch, err := s.identity.RequestEmailChange(r.Context(), acct.ID, req.Password, req.NewEmail)
+	switch {
+	case errors.Is(err, identity.ErrBadCredentials):
+		writeError(w, http.StatusForbidden, "password is incorrect")
+		return
+	case errors.Is(err, identity.ErrSameEmail):
+		writeError(w, http.StatusBadRequest, "that is already your address")
+		return
+	case err != nil && strings.HasPrefix(err.Error(), "identity: invalid"):
+		writeError(w, http.StatusBadRequest, "invalid email address")
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if ch.Token != "" && s.mailer != nil {
+		link := emaillink.Build(s.baseURL, s.siteBaseURL, emaillink.ConfirmEmail, ch.Token)
+		_ = s.mailer.Send(ch.NewEmail, "Confirm your new OpenPak email address",
+			"Hi "+acct.DisplayName+",\n\nOpen this link to make this the email address of your OpenPak account:\n"+link+
+				"\n\nThe link expires in 24 hours and can be used once. If you did not ask for this, ignore this message.")
+		_ = s.mailer.Send(ch.OldEmail, "Your OpenPak email address is being changed",
+			"Hi "+acct.DisplayName+",\n\nSomeone signed in to your OpenPak account asked to move it to a new email address. "+
+				"Nothing changes until the link sent to that address is opened.\n\n"+
+				"If this was not you, change your password now: it also signs out every other session.")
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": emailChangeMessage})
+}
+
+// handleEmailConfirm applies an email change from its token. JSON in, JSON
+// out; a form post (the core's own page below) gets a page back.
+func (s *Server) handleEmailConfirm(w http.ResponseWriter, r *http.Request) {
+	form := strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded")
+	var token string
+	if form {
+		if err := r.ParseForm(); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid form")
+			return
+		}
+		token = r.PostFormValue("token")
+	} else {
+		var req struct {
+			Token string `json:"token"`
+		}
+		if !decode(w, r, &req) {
+			return
+		}
+		token = req.Token
+	}
+	_, err := s.identity.ConfirmEmailChange(r.Context(), token)
+	if form {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		msg := "Your email address has been changed."
+		if err != nil {
+			msg = "This confirmation link is invalid or expired."
+		}
+		_, _ = w.Write([]byte(`<!DOCTYPE html><html lang="en"><body><p>` + msg + `</p></body></html>`))
+		return
+	}
+	if err != nil {
+		if errors.Is(err, identity.ErrTokenInvalid) {
+			writeError(w, http.StatusBadRequest, "confirmation link is invalid or expired")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "email address changed"})
+}
+
+// handleEmailConfirmPage is where the mailed link lands when the core serves
+// its own links: a button, so a mail scanner fetching the URL changes nothing.
+func (s *Server) handleEmailConfirmPage(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "token required")
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Confirm email address</title></head>
+<body><form method="post" action="/v1/email/confirm">
+<h1>Confirm your new email address</h1>
+<input type="hidden" name="token" value="` + htmlEscape(token) + `">
+<button type="submit">Confirm</button>
+</form></body></html>`))
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {

@@ -12,6 +12,7 @@ import "strings"
 const (
 	Verify        = "/verify"
 	ResetPassword = "/reset-password"
+	ConfirmEmail  = "/email/confirm"
 )
 
 // Build returns the emailed link for path. With siteBase set the link points at the

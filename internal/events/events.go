@@ -32,6 +32,7 @@ var KnownTypes = map[string]bool{
 	"friend_removed":         true,
 	"invitation_sent":        true,
 	"message":                true,
+	"email_changed":          true,
 }
 
 type Service struct {
