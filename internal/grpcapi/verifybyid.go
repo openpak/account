@@ -35,9 +35,14 @@ func (s *Server) VerifyPasswordByID(ctx context.Context, req *accountv1.VerifyPa
 			return nil, status.Error(codes.Internal, "internal error")
 		}
 	}
+	need2FA, err := s.secondFactorGate(ctx, acct.ID, req.GetSecondFactorSupported())
+	if err != nil {
+		return nil, err
+	}
 	return &accountv1.VerifyPasswordResponse{
-		AccountId:     acct.ID,
-		Status:        accountv1.AccountStatus_ACCOUNT_STATUS_ACTIVE,
-		EmailVerified: acct.EmailVerified,
+		AccountId:         acct.ID,
+		Status:            accountv1.AccountStatus_ACCOUNT_STATUS_ACTIVE,
+		EmailVerified:     acct.EmailVerified,
+		TwoFactorRequired: need2FA,
 	}, nil
 }

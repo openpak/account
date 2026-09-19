@@ -69,10 +69,11 @@ type Service struct {
 	pepper     string
 	sessionTTL time.Duration
 	emitter    Emitter
+	sealer     *sealer // TOTP secrets at rest; see SetTOTPKey
 }
 
 func New(pool *pgxpool.Pool, pepper string, sessionTTL time.Duration, emitter Emitter) *Service {
-	return &Service{pool: pool, pepper: pepper, sessionTTL: sessionTTL, emitter: emitter}
+	return &Service{pool: pool, pepper: pepper, sessionTTL: sessionTTL, emitter: emitter, sealer: newSealer(pepper)}
 }
 
 func normalizeEmail(email string) string {
@@ -204,14 +205,15 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 
 // Login validates credentials and creates a session. Enumeration-safe: the
 // same error is returned for unknown email and wrong password.
+// An account with two-factor authentication gets ErrTwoFactorRequired and no
+// session: BeginLogin/CompleteLogin are the two-step form.
 func (s *Service) Login(ctx context.Context, email, password string) (sessionToken string, acct *Account, err error) {
-	acct, err = s.VerifyCredentials(ctx, email, password)
+	token, challenge, acct, err := s.BeginLogin(ctx, email, password)
 	if err != nil {
 		return "", nil, err
 	}
-	token, err := s.createSession(ctx, acct.ID)
-	if err != nil {
-		return "", nil, err
+	if challenge != "" {
+		return "", nil, ErrTwoFactorRequired
 	}
 	return token, acct, nil
 }

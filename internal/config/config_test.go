@@ -25,3 +25,20 @@ func TestLoadFailsClosed(t *testing.T) {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 }
+
+func TestTOTPKeyIsOptionalButNotShort(t *testing.T) {
+	t.Setenv("ACCOUNT_DATABASE_URL", "postgres://localhost/test")
+	t.Setenv("ACCOUNT_SESSION_SECRET", "0123456789abcdef0123456789abcdef")
+	t.Setenv("ACCOUNT_TOTP_KEY", "")
+	if _, err := Load(); err != nil {
+		t.Fatalf("unset key: %v", err)
+	}
+	t.Setenv("ACCOUNT_TOTP_KEY", "short")
+	if _, err := Load(); err == nil {
+		t.Fatal("a short TOTP key must fail startup")
+	}
+	t.Setenv("ACCOUNT_TOTP_KEY", "fedcba9876543210fedcba9876543210")
+	if cfg, err := Load(); err != nil || cfg.TOTPKey == "" {
+		t.Fatalf("valid key: %+v %v", cfg, err)
+	}
+}

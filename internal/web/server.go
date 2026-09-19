@@ -41,6 +41,10 @@ func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string)
 	s.mux.HandleFunc("POST /v1/email/confirm", s.handleEmailConfirm)
 	s.mux.HandleFunc("GET /v1/email/confirm", s.handleEmailConfirmPage)
 	s.mux.HandleFunc("POST /v1/login", s.handleLogin)
+	s.mux.HandleFunc("POST /v1/login/2fa", s.handleLogin2FA)
+	s.mux.HandleFunc("POST /v1/2fa/setup", s.auth(s.handle2FASetup))
+	s.mux.HandleFunc("POST /v1/2fa/enable", s.auth(s.handle2FAEnable))
+	s.mux.HandleFunc("POST /v1/2fa/disable", s.auth(s.handle2FADisable))
 	s.mux.HandleFunc("POST /v1/logout", s.auth(s.handleLogout))
 	s.mux.HandleFunc("GET /v1/sessions", s.auth(s.handleListSessions))
 	s.mux.HandleFunc("DELETE /v1/sessions/{id}", s.auth(s.handleRevokeSession))
@@ -282,11 +286,21 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	token, _, err := s.identity.Login(r.Context(), req.Email, req.Password)
+	token, challenge, _, err := s.identity.BeginLogin(r.Context(), req.Email, req.Password)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
+	if challenge != "" {
+		// Password right, second factor owed: no cookie until /v1/login/2fa.
+		writeJSON(w, http.StatusAccepted, map[string]any{"two_factor_required": true, "challenge": challenge})
+		return
+	}
+	setSessionCookie(w, token)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "signed in"})
+}
+
+func setSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,
@@ -296,7 +310,99 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int((30 * 24 * time.Hour).Seconds()),
 	})
-	writeJSON(w, http.StatusOK, map[string]string{"message": "signed in"})
+}
+
+// handleLogin2FA completes a sign-in that POST /v1/login answered with a
+// challenge: {challenge, code} or {challenge, recovery_code}.
+func (s *Server) handleLogin2FA(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Challenge    string `json:"challenge"`
+		Code         string `json:"code"`
+		RecoveryCode string `json:"recovery_code"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	token, _, err := s.identity.CompleteLogin(r.Context(), req.Challenge, req.Code, req.RecoveryCode)
+	switch {
+	case err == nil:
+		setSessionCookie(w, token)
+		writeJSON(w, http.StatusOK, map[string]string{"message": "signed in"})
+	case errors.Is(err, identity.ErrTokenInvalid):
+		writeError(w, http.StatusUnauthorized, "sign-in challenge is invalid or expired; sign in again")
+	default:
+		writeTwoFactorError(w, err)
+	}
+}
+
+// writeTwoFactorError maps the two-factor outcomes every route shares.
+func writeTwoFactorError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, identity.ErrBadCredentials):
+		writeError(w, http.StatusForbidden, "password is incorrect")
+	case errors.Is(err, identity.ErrBadSecondFactor):
+		writeError(w, http.StatusUnauthorized, "invalid code")
+	case errors.Is(err, identity.ErrTwoFactorLocked):
+		w.Header().Set("Retry-After", "900")
+		writeError(w, http.StatusTooManyRequests, "too many attempts; try again in 15 minutes")
+	case errors.Is(err, identity.ErrTwoFactorEnabled), errors.Is(err, identity.ErrTwoFactorNotEnabled),
+		errors.Is(err, identity.ErrTwoFactorNotPending):
+		writeError(w, http.StatusConflict, strings.TrimPrefix(err.Error(), "identity: "))
+	default:
+		writeError(w, http.StatusInternalServerError, "internal error")
+	}
+}
+
+// handle2FASetup starts enrolment and returns the secret to put in an
+// authenticator app. Requires the password: a borrowed session must not be
+// able to tie the account to someone else's phone.
+func (s *Server) handle2FASetup(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
+	var req struct {
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	secret, uri, err := s.identity.BeginTwoFactor(r.Context(), acct.ID, req.Password)
+	if err != nil {
+		writeTwoFactorError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"secret": secret, "otpauth_uri": uri})
+}
+
+// handle2FAEnable finishes enrolment with a first code and hands out the ten
+// recovery codes, once.
+func (s *Server) handle2FAEnable(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
+	var req struct {
+		Code string `json:"code"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	codes, err := s.identity.EnableTwoFactor(r.Context(), acct.ID, req.Code)
+	if err != nil {
+		writeTwoFactorError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"recovery_codes": codes})
+}
+
+// handle2FADisable needs the password and a current code (a recovery code
+// counts, for someone who lost the phone).
+func (s *Server) handle2FADisable(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
+	var req struct {
+		Password string `json:"password"`
+		Code     string `json:"code"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if err := s.identity.DisableTwoFactor(r.Context(), acct.ID, req.Password, req.Code); err != nil {
+		writeTwoFactorError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "two-factor authentication disabled"})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request, acct *identity.Account) {

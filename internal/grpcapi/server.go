@@ -189,15 +189,60 @@ func (s *Server) VerifyPassword(ctx context.Context, req *accountv1.VerifyPasswo
 			return nil, status.Error(codes.Internal, "internal error")
 		}
 	}
+	need2FA, err := s.secondFactorGate(ctx, acct.ID, req.GetSecondFactorSupported())
+	if err != nil {
+		return nil, err
+	}
 	return &accountv1.VerifyPasswordResponse{
 		AccountId:     acct.ID,
 		Status:        accountv1.AccountStatus_ACCOUNT_STATUS_ACTIVE,
 		EmailVerified: acct.EmailVerified,
 		// The Switch adapter builds a user object from these; the console rejects it outright
 		// when either is missing.
-		Country:  acct.Country,
-		Birthday: acct.Birthday,
+		Country:           acct.Country,
+		Birthday:          acct.Birthday,
+		TwoFactorRequired: need2FA,
 	}, nil
+}
+
+// secondFactorGate applies the two-factor rule to a password that has just
+// checked out (see VerifyPasswordRequest.second_factor_supported): callers
+// that cannot run a second factor fail closed, the rest are told it is owed.
+func (s *Server) secondFactorGate(ctx context.Context, accountID string, supported bool) (bool, error) {
+	on, err := s.identity.TwoFactorEnabled(ctx, accountID)
+	if err != nil {
+		return false, status.Error(codes.Internal, "internal error")
+	}
+	if on && !supported {
+		return false, status.Error(codes.FailedPrecondition, "two-factor authentication required")
+	}
+	return on, nil
+}
+
+// VerifySecondFactor is the second half of a password check for an account
+// with two-factor authentication.
+func (s *Server) VerifySecondFactor(ctx context.Context, req *accountv1.VerifySecondFactorRequest) (*accountv1.VerifySecondFactorResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	if req.GetAccountId() == "" || (req.GetCode() == "" && req.GetRecoveryCode() == "") {
+		return nil, status.Error(codes.InvalidArgument, "account_id and a code or recovery_code are required")
+	}
+	res, err := s.identity.VerifySecondFactor(ctx, req.GetAccountId(), req.GetCode(), req.GetRecoveryCode())
+	switch {
+	case err == nil:
+		return &accountv1.VerifySecondFactorResponse{RecoveryCodeUsed: res.RecoveryCodeUsed,
+			RecoveryCodesLeft: uint32(res.RecoveryCodesLeft)}, nil
+	case errors.Is(err, identity.ErrBadSecondFactor):
+		return nil, status.Error(codes.Unauthenticated, "invalid code")
+	case errors.Is(err, identity.ErrTwoFactorLocked):
+		return nil, status.Error(codes.ResourceExhausted, err.Error())
+	case errors.Is(err, identity.ErrTwoFactorNotEnabled):
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	case strings.Contains(err.Error(), "SQLSTATE 22P02"):
+		return nil, status.Error(codes.FailedPrecondition, identity.ErrTwoFactorNotEnabled.Error())
+	}
+	return nil, status.Error(codes.Internal, "internal error")
 }
 
 func (s *Server) GetAccount(ctx context.Context, req *accountv1.GetAccountRequest) (*accountv1.GetAccountResponse, error) {
@@ -212,13 +257,18 @@ func (s *Server) GetAccount(ctx context.Context, req *accountv1.GetAccountReques
 		}
 		return nil, status.Error(codes.Internal, "internal error")
 	}
+	twoFA, err := s.identity.TwoFactorEnabled(ctx, a.ID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "internal error")
+	}
 	return &accountv1.GetAccountResponse{
-		AccountId:     a.ID,
-		Status:        protoStatus(a.Status),
-		EmailVerified: a.EmailVerified,
-		DisplayName:   a.DisplayName,
-		Country:       a.Country,
-		Birthday:      a.Birthday,
+		TwoFactorEnabled: twoFA,
+		AccountId:        a.ID,
+		Status:           protoStatus(a.Status),
+		EmailVerified:    a.EmailVerified,
+		DisplayName:      a.DisplayName,
+		Country:          a.Country,
+		Birthday:         a.Birthday,
 	}, nil
 }
 

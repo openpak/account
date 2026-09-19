@@ -74,6 +74,9 @@ func run() error {
 	}
 	evSvc := events.New(pool)
 	ident := identity.New(pool, cfg.SessionSecret, sessionTTL, evSvc)
+	if cfg.TOTPKey != "" {
+		ident.SetTOTPKey(cfg.TOTPKey)
+	}
 	lnks := links.New(pool, evSvc)
 	socSvc := social.New(pool, evSvc)
 	sessSvc := sessions.New(pool)

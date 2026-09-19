@@ -25,6 +25,7 @@ const (
 	Identity_RequestAccountDeletion_FullMethodName  = "/openpak.account.v1.Identity/RequestAccountDeletion"
 	Identity_VerifyAdapterCredential_FullMethodName = "/openpak.account.v1.Identity/VerifyAdapterCredential"
 	Identity_GetAccount_FullMethodName              = "/openpak.account.v1.Identity/GetAccount"
+	Identity_VerifySecondFactor_FullMethodName      = "/openpak.account.v1.Identity/VerifySecondFactor"
 )
 
 // IdentityClient is the client API for Identity service.
@@ -51,6 +52,12 @@ type IdentityClient interface {
 	VerifyAdapterCredential(ctx context.Context, in *VerifyAdapterCredentialRequest, opts ...grpc.CallOption) (*VerifyAdapterCredentialResponse, error)
 	// Resolve an account by ID for status and minimal profile projection.
 	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
+	// The second half of a password check for an account with two-factor
+	// authentication (see the rule on VerifyPasswordRequest). Takes a TOTP code
+	// or a recovery code. Unauthenticated for a wrong or reused code,
+	// ResourceExhausted after 5 wrong codes in 15 minutes (shared with web
+	// sign-in), FailedPrecondition when the account has no second factor.
+	VerifySecondFactor(ctx context.Context, in *VerifySecondFactorRequest, opts ...grpc.CallOption) (*VerifySecondFactorResponse, error)
 }
 
 type identityClient struct {
@@ -121,6 +128,16 @@ func (c *identityClient) GetAccount(ctx context.Context, in *GetAccountRequest, 
 	return out, nil
 }
 
+func (c *identityClient) VerifySecondFactor(ctx context.Context, in *VerifySecondFactorRequest, opts ...grpc.CallOption) (*VerifySecondFactorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifySecondFactorResponse)
+	err := c.cc.Invoke(ctx, Identity_VerifySecondFactor_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IdentityServer is the server API for Identity service.
 // All implementations must embed UnimplementedIdentityServer
 // for forward compatibility.
@@ -145,6 +162,12 @@ type IdentityServer interface {
 	VerifyAdapterCredential(context.Context, *VerifyAdapterCredentialRequest) (*VerifyAdapterCredentialResponse, error)
 	// Resolve an account by ID for status and minimal profile projection.
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
+	// The second half of a password check for an account with two-factor
+	// authentication (see the rule on VerifyPasswordRequest). Takes a TOTP code
+	// or a recovery code. Unauthenticated for a wrong or reused code,
+	// ResourceExhausted after 5 wrong codes in 15 minutes (shared with web
+	// sign-in), FailedPrecondition when the account has no second factor.
+	VerifySecondFactor(context.Context, *VerifySecondFactorRequest) (*VerifySecondFactorResponse, error)
 	mustEmbedUnimplementedIdentityServer()
 }
 
@@ -172,6 +195,9 @@ func (UnimplementedIdentityServer) VerifyAdapterCredential(context.Context, *Ver
 }
 func (UnimplementedIdentityServer) GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAccount not implemented")
+}
+func (UnimplementedIdentityServer) VerifySecondFactor(context.Context, *VerifySecondFactorRequest) (*VerifySecondFactorResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifySecondFactor not implemented")
 }
 func (UnimplementedIdentityServer) mustEmbedUnimplementedIdentityServer() {}
 func (UnimplementedIdentityServer) testEmbeddedByValue()                  {}
@@ -302,6 +328,24 @@ func _Identity_GetAccount_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Identity_VerifySecondFactor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifySecondFactorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServer).VerifySecondFactor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Identity_VerifySecondFactor_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServer).VerifySecondFactor(ctx, req.(*VerifySecondFactorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Identity_ServiceDesc is the grpc.ServiceDesc for Identity service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -332,6 +376,10 @@ var Identity_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAccount",
 			Handler:    _Identity_GetAccount_Handler,
+		},
+		{
+			MethodName: "VerifySecondFactor",
+			Handler:    _Identity_VerifySecondFactor_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

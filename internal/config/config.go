@@ -17,6 +17,10 @@ type Config struct {
 	SessionTTL     string
 	Environment    string // "development" | "production"
 	AllowedOrigins []string
+	// TOTPKey seals two-factor secrets at rest (AES-256-GCM, key =
+	// SHA-256 of it). Optional; unset derives the key from SessionSecret.
+	// Changing it makes every enrolled second factor unreadable.
+	TOTPKey string
 }
 
 func Load() (*Config, error) {
@@ -27,6 +31,7 @@ func Load() (*Config, error) {
 		HTTPListenAddr: envOr("ACCOUNT_HTTP_ADDR", ":8000"),
 		SessionTTL:     envOr("ACCOUNT_SESSION_TTL", "720h"),
 		Environment:    envOr("ACCOUNT_ENVIRONMENT", "production"),
+		TOTPKey:        os.Getenv("ACCOUNT_TOTP_KEY"),
 	}
 	if origins := os.Getenv("ACCOUNT_ALLOWED_ORIGINS"); origins != "" {
 		c.AllowedOrigins = strings.Split(origins, ",")
@@ -43,6 +48,9 @@ func Load() (*Config, error) {
 	}
 	if len(c.SessionSecret) < 32 {
 		return nil, errors.New("ACCOUNT_SESSION_SECRET must be at least 32 bytes")
+	}
+	if c.TOTPKey != "" && len(c.TOTPKey) < 32 {
+		return nil, errors.New("ACCOUNT_TOTP_KEY must be at least 32 bytes when set")
 	}
 	return c, nil
 }
