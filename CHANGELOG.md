@@ -5,6 +5,11 @@ of truth; this file is the readable summary.
 
 ## Unreleased
 
+- Emails in the website's languages: verification, email change (new and old address) and
+  password reset follow the request's `Accept-Language` (German, French, Brazilian
+  Portuguese, Italian, Spanish; English otherwise) — `internal/mailtext`. The website sends
+  the page language; console registrations over gRPC stay English.
+
 Website contracts (branch `contracts-2026-09-19`):
 
 - `GET /v1/whoami`; sessions accepted as `Authorization: Bearer`; login answers `account_id` (CR-4)

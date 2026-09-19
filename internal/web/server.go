@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"openpak/account/internal/emaillink"
+	"openpak/account/internal/mailtext"
 	"os"
 	"strings"
 	"time"
@@ -125,7 +126,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		// must NOT change the response (enumeration resistance) — the
 		// user's repair path is retrying registration, which resends.
 		if s.mailer != nil {
-			_ = s.sendVerificationEmail(acct.Email, acct.DisplayName, verifyToken)
+			_ = s.sendVerificationEmail(r, acct.Email, acct.DisplayName, verifyToken)
 			break
 		}
 		// No mailer configured (development): make the flow completable by
@@ -136,7 +137,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		// Existing unverified account: resending on retry repairs the
 		// failed-delivery trap. Response identical to fresh success.
 		if token := s.identity.ResendVerificationIfUnverified(r.Context(), req.Email, req.Password); token != "" && s.mailer != nil {
-			_ = s.sendVerificationEmail(normalizeEmailAddress(req.Email), "", token)
+			_ = s.sendVerificationEmail(r, normalizeEmailAddress(req.Email), "", token)
 		}
 		writeJSON(w, http.StatusOK, maskedVerificationMessage)
 		return
@@ -157,11 +158,10 @@ func normalizeEmailAddress(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-func (s *Server) sendVerificationEmail(to, displayName, token string) error {
+func (s *Server) sendVerificationEmail(r *http.Request, to, displayName, token string) error {
 	link := emaillink.Build(s.baseURL, s.siteBaseURL, emaillink.Verify, token)
-	body := "Hi " + displayName + ",\n\nConfirm your OpenPak account email address:\n" + link +
-		"\n\nIf you did not create this account, ignore this message."
-	return s.mailer.Send(to, "Confirm your OpenPak email", body)
+	subject, body := mailtext.Get(mailtext.Lang(r.Header.Get("Accept-Language")), mailtext.Verify, displayName, link)
+	return s.mailer.Send(to, subject, body)
 }
 
 func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
@@ -186,7 +186,7 @@ const resendMessage = "if the address still needs confirming, a new link has bee
 // throttle the register-retry repair path uses); the old link stops working.
 func (s *Server) handleVerifyResend(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
 	if token := s.identity.ResendVerificationForAccount(r.Context(), acct.ID); token != "" && s.mailer != nil {
-		_ = s.sendVerificationEmail(acct.Email, acct.DisplayName, token)
+		_ = s.sendVerificationEmail(r, acct.Email, acct.DisplayName, token)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": resendMessage})
 }
@@ -224,13 +224,11 @@ func (s *Server) handleEmailChange(w http.ResponseWriter, r *http.Request, acct 
 	}
 	if ch.Token != "" && s.mailer != nil {
 		link := emaillink.Build(s.baseURL, s.siteBaseURL, emaillink.ConfirmEmail, ch.Token)
-		_ = s.mailer.Send(ch.NewEmail, "Confirm your new OpenPak email address",
-			"Hi "+acct.DisplayName+",\n\nOpen this link to make this the email address of your OpenPak account:\n"+link+
-				"\n\nThe link expires in 24 hours and can be used once. If you did not ask for this, ignore this message.")
-		_ = s.mailer.Send(ch.OldEmail, "Your OpenPak email address is being changed",
-			"Hi "+acct.DisplayName+",\n\nSomeone signed in to your OpenPak account asked to move it to a new email address. "+
-				"Nothing changes until the link sent to that address is opened.\n\n"+
-				"If this was not you, change your password now: it also signs out every other session.")
+		lang := mailtext.Lang(r.Header.Get("Accept-Language"))
+		subject, body := mailtext.Get(lang, mailtext.EmailChange, acct.DisplayName, link)
+		_ = s.mailer.Send(ch.NewEmail, subject, body)
+		subject, body = mailtext.Get(lang, mailtext.EmailChangeNotice, acct.DisplayName, "")
+		_ = s.mailer.Send(ch.OldEmail, subject, body)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": emailChangeMessage})
 }
@@ -497,7 +495,7 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	// exists, via the mailer. A nil mailer (misconfiguration/development)
 	// must not panic: respond identically and log (review follow-up).
 	if token != "" && s.mailer != nil {
-		if err := s.sendPasswordResetEmail(normalizeEmailAddress(req.Email), token); err != nil {
+		if err := s.sendPasswordResetEmail(r, normalizeEmailAddress(req.Email), token); err != nil {
 			// Response unchanged; the user can retry (a new token is
 			// issued and old one remains valid until expiry).
 		}
@@ -505,13 +503,10 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "if the address is registered, a reset email has been sent"})
 }
 
-func (s *Server) sendPasswordResetEmail(to, token string) error {
+func (s *Server) sendPasswordResetEmail(r *http.Request, to, token string) error {
 	link := emaillink.Build(s.baseURL, s.siteBaseURL, emaillink.ResetPassword, token)
-	body := "A password reset was requested for your OpenPak account.\n\n" +
-		"Open this link to choose a new password:\n" + link +
-		"\n\nThe link expires in 24 hours and can be used once.\n" +
-		"If you did not request this, ignore this message; your password is unchanged."
-	return s.mailer.Send(to, "Reset your OpenPak password", body)
+	subject, body := mailtext.Get(mailtext.Lang(r.Header.Get("Accept-Language")), mailtext.Reset, "", link)
+	return s.mailer.Send(to, subject, body)
 }
 
 // handleResetPasswordPage renders the token-consuming reset form (FR-5

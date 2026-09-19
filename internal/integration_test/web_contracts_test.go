@@ -298,3 +298,20 @@ func TestWhoami(t *testing.T) {
 		t.Fatalf("whoami after logout: %d", rec.Code)
 	}
 }
+
+// The website forwards the page language as Accept-Language; the mail follows it.
+func TestMailLanguage(t *testing.T) {
+	_, h, box := webEnv(t)
+	req := httptest.NewRequest("POST", "/v1/register", strings.NewReader(
+		`{"email":"lang@example.com","password":"correct horse battery","display_name":"Ana"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept-Language", "de")
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	msgs := box.all()
+	if len(msgs) != 1 || !strings.HasPrefix(msgs[0].Body, "Hallo Ana,") || !strings.Contains(msgs[0].Subject, "Bestätige") {
+		t.Fatalf("mails %+v", msgs)
+	}
+	if box.lastToken(t, "lang@example.com") == "" {
+		t.Fatal("no link in the German mail")
+	}
+}
