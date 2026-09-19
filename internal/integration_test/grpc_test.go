@@ -21,6 +21,7 @@ import (
 	"openpak/account/internal/identity"
 	"openpak/account/internal/invitations"
 	"openpak/account/internal/links"
+	"openpak/account/internal/moderation"
 	"openpak/account/internal/sessions"
 	"openpak/account/internal/social"
 	"openpak/account/internal/storage"
@@ -58,7 +59,7 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, a
 	lis := bufconn.Listen(1024 * 1024)
 	fedSvc := federation.New(pool, grpcInternalKey)
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(fedSvc)))
-	api := grpcapi.New(ident, lnks, evSvc, soc, sessSvc, invSvc, grpcapi.Options{Federation: fedSvc})
+	api := grpcapi.New(ident, lnks, evSvc, soc, sessSvc, invSvc, grpcapi.Options{Federation: fedSvc, Moderation: moderation.New(pool)})
 	accountv1.RegisterIdentityServer(srv, api)
 	accountv1.RegisterLinksServer(srv, api)
 	accountv1.RegisterEventsServer(srv, api)
@@ -66,6 +67,7 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, a
 	accountv1.RegisterSessionsServer(srv, api)
 	accountv1.RegisterInvitationsServer(srv, api)
 	accountv1.RegisterFederationServer(srv, api)
+	accountv1.RegisterModerationServer(srv, api)
 	go srv.Serve(lis)
 	t.Cleanup(srv.Stop)
 

@@ -18,6 +18,7 @@ import (
 	"openpak/account/internal/invitations"
 	"openpak/account/internal/links"
 	"openpak/account/internal/mailer"
+	"openpak/account/internal/moderation"
 	"openpak/account/internal/sessions"
 	"openpak/account/internal/social"
 	accountv1 "openpak/account/proto/openpak/account/v1"
@@ -32,6 +33,7 @@ type Server struct {
 	accountv1.UnimplementedSessionsServer
 	accountv1.UnimplementedInvitationsServer
 	accountv1.UnimplementedFederationServer
+	accountv1.UnimplementedModerationServer
 	identity    *identity.Service
 	federation  *federation.Service
 	links       *links.Service
@@ -39,6 +41,7 @@ type Server struct {
 	social      *social.Service
 	sessions    *sessions.Service
 	invitations *invitations.Service
+	moderation  *moderation.Service
 	mailer      *mailer.Mailer
 	baseURL     string
 	siteBaseURL string
@@ -52,13 +55,16 @@ type Options struct {
 	SiteBaseURL string
 	// Federation is the node register. Nil only in tests that never touch it.
 	Federation *federation.Service
+	// Moderation is account search and the reports queue. Nil answers
+	// Unimplemented on the Moderation service.
+	Moderation *moderation.Service
 }
 
 func New(ident *identity.Service, lnks *links.Service, evs *events.Service, soc *social.Service, sess *sessions.Service, inv *invitations.Service, opts Options) *Server {
 	if opts.BaseURL == "" {
 		opts.BaseURL = "http://localhost:8000"
 	}
-	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL, siteBaseURL: opts.SiteBaseURL, federation: opts.Federation}
+	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL, siteBaseURL: opts.SiteBaseURL, federation: opts.Federation, moderation: opts.Moderation}
 }
 
 func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsRequest) (*accountv1.PollEventsResponse, error) {

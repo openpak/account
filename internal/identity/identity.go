@@ -538,14 +538,26 @@ func (s *Service) VerifyByID(ctx context.Context, accountID, password string) (*
 // invalidation events so adapters revoke credentials (FR-7, §7). Banning
 // revokes all active web sessions immediately.
 func (s *Service) SetBanned(ctx context.Context, accountID string, banned bool) error {
+	return s.SetBannedBy(ctx, accountID, banned, "", "system")
+}
+
+// SetBannedBy is SetBanned with the moderator's reason and name recorded in
+// moderation_actions, in the same transaction as the status change and its
+// event: an account is never banned without a record of who did it and why.
+// Only active and banned accounts move; one being deleted stays deleted
+// (unbanning it must not bring it back), and answers ErrNotFound.
+func (s *Service) SetBannedBy(ctx context.Context, accountID string, banned bool, reason, actor string) error {
 	status := "active"
 	typ := "account_unbanned"
+	action := "unban"
 	if banned {
 		status = "banned"
 		typ = "account_banned"
+		action = "ban"
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `UPDATE accounts SET status=$2, updated_at=now() WHERE id=$1 AND status <> 'deleted'`, accountID, status)
+		tag, err := tx.Exec(ctx, `UPDATE accounts SET status=$2, updated_at=now()
+			WHERE id=$1 AND status IN ('active','banned')`, accountID, status)
 		if err != nil {
 			return err
 		}
@@ -556,6 +568,10 @@ func (s *Service) SetBanned(ctx context.Context, accountID string, banned bool) 
 			if _, err := tx.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE account_id=$1 AND revoked_at IS NULL`, accountID); err != nil {
 				return err
 			}
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO moderation_actions (account_id, action, reason, actor)
+			VALUES ($1,$2,$3,$4)`, accountID, action, reason, actor); err != nil {
+			return err
 		}
 		if s.emitter != nil {
 			return s.emitter.EmitTx(ctx, tx, typ, accountID, "", "")
