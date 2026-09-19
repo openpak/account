@@ -3,6 +3,12 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.9.3 — 2026-09-19
+
+- Mail headers for real SMTP providers (Zoho): RFC 2047-encoded subjects (the translated
+  ones are not ASCII), a `Message-ID`, `Content-Transfer-Encoding: 8bit`, and
+  `ACCOUNT_SMTP_FROM` may carry a display name (`OpenPak <noreply@openpak.org>`).
+
 ## v0.9.2 — 2026-09-19
 
 - Emails in the website's languages: verification, email change (new and old address) and
