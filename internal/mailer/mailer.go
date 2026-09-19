@@ -3,10 +3,14 @@
 package mailer
 
 import (
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"mime"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"strings"
 	"time"
@@ -17,7 +21,7 @@ type Config struct {
 	Port     int    // SMTP port (587 typical)
 	Username string
 	Password string
-	From     string // envelope From address
+	From     string // "noreply@openpak.org" or "OpenPak <noreply@openpak.org>"
 	// NoTLSForLocalhost permits plain SMTP on loopback for development.
 	NoTLSForLocalhost bool
 }
@@ -45,13 +49,25 @@ func (m *Mailer) Send(to, subject, body string) error {
 	if m == nil || m.cfg.Host == "" || m.cfg.From == "" {
 		return errors.New("mailer: not configured")
 	}
-	from := m.cfg.From
+	// The From header may carry a display name; the envelope wants the bare address.
+	fromAddr, err := mail.ParseAddress(m.cfg.From)
+	if err != nil {
+		return fmt.Errorf("mailer: from: %w", err)
+	}
+	from := fromAddr.Address
+	_, domain, _ := strings.Cut(from, "@")
+	id := make([]byte, 12)
+	_, _ = rand.Read(id)
 	headers := strings.Join([]string{
-		"From: " + from,
+		"From: " + fromAddr.String(),
 		"To: " + to,
-		"Subject: " + sanitizeHeader(subject),
+		// Encoded, because translated subjects are not ASCII and real MTAs
+		// and spam filters reject or penalise raw 8-bit headers.
+		"Subject: " + mime.QEncoding.Encode("utf-8", sanitizeHeader(subject)),
+		"Message-ID: <" + hex.EncodeToString(id) + "@" + domain + ">",
 		"MIME-Version: 1.0",
 		"Content-Type: text/plain; charset=\"utf-8\"",
+		"Content-Transfer-Encoding: 8bit",
 		"Date: " + time.Now().Format(time.RFC1123Z),
 	}, "\r\n")
 	msg := []byte(headers + "\r\n\r\n" + body + "\r\n")
