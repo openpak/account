@@ -19,7 +19,7 @@ func (s *Server) RegisterSession(ctx context.Context, req *accountv1.RegisterSes
 		return nil, err
 	}
 	id, lease, err := s.sessions.Register(ctx, req.GetAccountId(), req.GetNamespace(),
-		req.GetTitleId(), req.GetEndpointRef(), NodeFromContext(ctx), time.Duration(req.GetLeaseSeconds())*time.Second)
+		req.GetTitleId(), req.GetEndpointRef(), NodeFromContext(ctx), time.Duration(req.GetLeaseSeconds())*time.Second, req.GetClient())
 	if err != nil {
 		return nil, mapSessionErr(err)
 	}
@@ -148,7 +148,7 @@ func (s *Server) GetPresence(ctx context.Context, req *accountv1.GetPresenceRequ
 	resp := &accountv1.GetPresenceResponse{}
 	for _, p := range ps {
 		resp.Presence = append(resp.Presence, &accountv1.Presence{
-			AccountId: p.AccountID, Namespace: p.Namespace, TitleId: p.TitleID, SinceUnix: p.SinceUnix, NodeId: p.NodeID,
+			AccountId: p.AccountID, Namespace: p.Namespace, TitleId: p.TitleID, SinceUnix: p.SinceUnix, NodeId: p.NodeID, Client: p.Client,
 		})
 	}
 	return resp, nil

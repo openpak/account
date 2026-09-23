@@ -3,6 +3,17 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.10.0 — 2026-09-23
+
+- Cross-network presence with client labels: `RegisterSessionRequest.client` and
+  `Presence.client` (field 6, optional, max 64 bytes) — "switch", "ryujinx", "eden", "citron",
+  "wiiu", "3ds", "cemu", "azahar", or empty when the adapter cannot tell. Migration `0018`
+  adds `adapter_sessions.client` (default `''`).
+- One live session per (account, namespace, title), was (account, title): signed in on a
+  Switch and a Wii U at once no longer fight over one title-less row. Migration `0018`
+  carries the SQL to put the old key back if the core is ever rolled back.
+- `GetPresence` prefers a session in a title over a title-less one, then the newest.
+
 ## v0.9.3 — 2026-09-19
 
 - Mail headers for real SMTP providers (Zoho): RFC 2047-encoded subjects (the translated

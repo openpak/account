@@ -32,20 +32,25 @@ type Session struct {
 	TitleID     string
 	EndpointRef string
 	NodeID      string
+	Client      string
 }
 
 type Service struct{ pool *pgxpool.Pool }
 
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
+// MaxClientLen caps the client label an adapter may attach to a session.
+const MaxClientLen = 64
+
 // Register inserts a live session, replacing any previous session for the
-// same (account, title). Returns the server-assigned session ID and the
-// applied lease.
-func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, endpointRef, nodeID string, lease time.Duration) (string, time.Duration, error) {
+// same (account, namespace, title). Returns the server-assigned session ID and
+// the applied lease. client names what the person is on inside the namespace
+// ("ryujinx", "switch", "cemu", ...); empty means the adapter could not tell.
+func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, endpointRef, nodeID string, lease time.Duration, client string) (string, time.Duration, error) {
 	// titleID may be empty, and that is a fact rather than a gap: it means signed in to this
 	// network and not in any title. Being online and playing something are different things and
 	// the status page reports them separately, so the distinction has to survive down here.
-	if accountID == "" || namespace == "" || endpointRef == "" || nodeID == "" {
+	if accountID == "" || namespace == "" || endpointRef == "" || nodeID == "" || len(client) > MaxClientLen {
 		return "", 0, ErrInvalid
 	}
 	if lease <= 0 {
@@ -64,19 +69,22 @@ func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, e
 		return "", 0, ErrAccountUnknown
 	}
 	id := newUUID()
-	// Atomic replacement: the unique (account_id, title_id) key backs an
-	// upsert, so concurrent registrations converge on exactly one live row.
+	// Atomic replacement: the unique (account_id, namespace, title_id) key
+	// backs an upsert, so concurrent registrations converge on exactly one
+	// live row. The namespace is part of the key so that being signed in on a
+	// Switch and on a Wii U at once (both title-less) are two rows, not one
+	// row the two adapters keep taking from each other.
 	if _, err := s.pool.Exec(ctx, `INSERT INTO adapter_sessions
-		(session_id, account_id, namespace, title_id, endpoint_ref, node_id, expires_at)
-		VALUES ($1,$2,$3,$4,$5,$7, now() + make_interval(secs => $6))
-		ON CONFLICT (account_id, title_id) DO UPDATE SET
+		(session_id, account_id, namespace, title_id, endpoint_ref, node_id, client, expires_at)
+		VALUES ($1,$2,$3,$4,$5,$7,$8, now() + make_interval(secs => $6))
+		ON CONFLICT (account_id, namespace, title_id) DO UPDATE SET
 			session_id = EXCLUDED.session_id,
-			namespace = EXCLUDED.namespace,
 			endpoint_ref = EXCLUDED.endpoint_ref,
 			node_id = EXCLUDED.node_id,
+			client = EXCLUDED.client,
 			expires_at = EXCLUDED.expires_at,
 			updated_at = now()`,
-		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds()), nodeID); err != nil {
+		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds()), nodeID, client); err != nil {
 		return "", 0, fmt.Errorf("sessions: register: %w", err)
 	}
 	return id, lease, nil
@@ -139,7 +147,8 @@ func (s *Service) Resolve(ctx context.Context, accountID, titleID string) (*Sess
 	sess := &Session{}
 	err := s.pool.QueryRow(ctx, `SELECT s.session_id, s.account_id, s.namespace, s.title_id, s.endpoint_ref
 		FROM adapter_sessions s JOIN accounts a ON a.id = s.account_id
-		WHERE s.account_id=$1 AND s.title_id=$2 AND s.expires_at > now() AND a.status = 'active'`,
+		WHERE s.account_id=$1 AND s.title_id=$2 AND s.expires_at > now() AND a.status = 'active'
+		ORDER BY s.updated_at DESC LIMIT 1`,
 		accountID, titleID).Scan(&sess.ID, &sess.AccountID, &sess.Namespace, &sess.TitleID, &sess.EndpointRef)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Reap expired rows and invalidate rows of inactive owners.
@@ -184,6 +193,7 @@ type Presence struct {
 	TitleID   string
 	SinceUnix int64
 	NodeID    string
+	Client    string
 }
 
 // MaxPresenceAccounts caps one presence query. A friends list is the caller.
@@ -191,8 +201,10 @@ const MaxPresenceAccounts = 200
 
 // GetPresence returns an entry for each of the given accounts that holds a live
 // session. Accounts that are offline are simply absent: no row, no guess. A
-// person in two titles at once yields the most recently registered session,
-// because the phone shows one line per friend.
+// person with several live sessions yields one, because the phone shows one
+// line per friend: a session in a title beats a title-less one (signed in on a
+// second device must not hide the game being played), then the most recently
+// registered wins.
 func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Presence, error) {
 	if len(accountIDs) == 0 {
 		return nil, nil
@@ -201,10 +213,10 @@ func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Prese
 		return nil, ErrInvalid
 	}
 	rows, err := s.pool.Query(ctx, `SELECT DISTINCT ON (account_id)
-			account_id, namespace, title_id, extract(epoch FROM created_at)::bigint, node_id
+			account_id, namespace, title_id, extract(epoch FROM created_at)::bigint, node_id, client
 		FROM adapter_sessions
 		WHERE account_id = ANY($1::uuid[]) AND expires_at > now()
-		ORDER BY account_id, created_at DESC`, accountIDs)
+		ORDER BY account_id, (title_id <> '') DESC, created_at DESC`, accountIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +224,7 @@ func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Prese
 	var out []Presence
 	for rows.Next() {
 		var p Presence
-		if err := rows.Scan(&p.AccountID, &p.Namespace, &p.TitleID, &p.SinceUnix, &p.NodeID); err != nil {
+		if err := rows.Scan(&p.AccountID, &p.Namespace, &p.TitleID, &p.SinceUnix, &p.NodeID, &p.Client); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
