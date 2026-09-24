@@ -3,6 +3,10 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.10.1 — 2026-09-24
+
+- deps: grpc 1.83.2, x/crypto 0.57, x/net 0.59, pgx 5.11 (Dependabot)
+
 ## v0.10.0 — 2026-09-23
 
 - Cross-network presence with client labels: `RegisterSessionRequest.client` and
