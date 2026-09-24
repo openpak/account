@@ -27,6 +27,11 @@ of truth; this file is the readable summary.
   Portuguese, Italian, Spanish; English otherwise) — `internal/mailtext`. The website sends
   the page language; console registrations over gRPC stay English.
 
+## v0.9.1 — 2026-09-19
+
+- release: the registry auth file is set per step; the job-level runner context made the
+  workflow invalid
+
 ## v0.9.0 — 2026-09-19
 
 Website contracts (branch `contracts-2026-09-19`):
@@ -46,6 +51,10 @@ Website contracts (branch `contracts-2026-09-19`):
 - release: job-scoped registry auth file [b76de6b]
 - release: build on the self-hosted runner with podman; private-repo minutes are metered [6f8278e]
 
+## v0.8.0 — 2026-09-10
+
+- Events: `friend_accepted` and `friend_removed`
+- Go 1.26, the house version
 
 ## v0.7.0 — 2026-09-09
 
