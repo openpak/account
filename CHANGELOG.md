@@ -3,6 +3,15 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.12.0 — 2026-09-26
+
+- Playtime counts only time a game server confirmed the player online, not time a title sat open:
+  `Sessions.MarkOnline` (game servers, every ~30 s, batched) adds the time since a player's
+  previous mark — gaps over 90 s add nothing — to their live titled presence session
+  (`adapter_sessions.online_seconds`), the session-end trigger carries it into
+  `play_sessions.online_seconds`, and `GetPlaytime` sums that. Client and OS still come from
+  presence, so a game server only needs the account id.
+
 ## v0.11.0 — 2026-09-26
 
 - Playtime per title, client and OS: `RegisterSessionRequest.os` / `Presence.os` (windows, macos,

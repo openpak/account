@@ -236,3 +236,19 @@ func (s *Server) GetPlaytime(ctx context.Context, _ *accountv1.GetPlaytimeReques
 	}
 	return resp, nil
 }
+
+// MarkOnline is a game server confirming who is connected to it; see sessions.MarkOnline.
+func (s *Server) MarkOnline(ctx context.Context, req *accountv1.MarkOnlineRequest) (*accountv1.MarkOnlineResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	players := make([]sessions.OnlinePlayer, 0, len(req.GetPlayers()))
+	for _, p := range req.GetPlayers() {
+		players = append(players, sessions.OnlinePlayer{AccountID: p.GetAccountId(), Namespace: p.GetNamespace(), TitleID: p.GetTitleId()})
+	}
+	n, err := s.sessions.MarkOnline(ctx, players)
+	if err != nil {
+		return nil, mapSessionErr(err)
+	}
+	return &accountv1.MarkOnlineResponse{Marked: int32(n)}, nil
+}
