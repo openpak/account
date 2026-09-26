@@ -3,6 +3,15 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.13.0 — 2026-09-26
+
+- Playtime runs from a session's first game-server login to its end. nx-baas and nn-account call
+  `Sessions.MarkOnline` when a game server asks them for a player's identity at login; that sets
+  `adapter_sessions.online_since` on the player's live titled presence session (a later login does
+  not reset it), and `GetPlaytime` counts `online_since` → last renewal. A title left open without
+  reaching a game server counts nothing. Replaces v0.12.0's timed per-mark increments, which
+  needed every game server to report on a timer (migration 0021; 0020's columns are unused).
+
 ## v0.12.0 — 2026-09-26
 
 - Playtime counts only time a game server confirmed the player online, not time a title sat open:

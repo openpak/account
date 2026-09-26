@@ -352,15 +352,18 @@ type PlayTally struct {
 	Sessions                       int
 }
 
-// Playtime adds up, per title, client and OS, the time game servers confirmed
-// players online (MarkOnline): every finished session (play_sessions, written by
-// the trigger in 0019/0020) and every session still in adapter_sessions. A
-// session nobody's game server saw adds nothing, however long the title was open.
+// Playtime adds up, per title, client and OS, the time from a player's first
+// game-server login in a session (MarkOnline) to the session's last renewal:
+// every finished session (play_sessions, written by the trigger in 0021) and
+// every session still in adapter_sessions. A session that never reached a game
+// server adds nothing, however long the title was open.
 func (s *Service) Playtime(ctx context.Context) ([]PlayTally, error) {
 	rows, err := s.pool.Query(ctx, `WITH d AS (
 			SELECT namespace, title_id, client, os, online_seconds AS secs FROM play_sessions
 			UNION ALL
-			SELECT namespace, title_id, client, os, online_seconds FROM adapter_sessions WHERE title_id <> '')
+			SELECT namespace, title_id, client, os,
+				GREATEST(0, extract(epoch FROM updated_at - online_since))::int
+			FROM adapter_sessions WHERE title_id <> '' AND online_since IS NOT NULL)
 		SELECT namespace, title_id, client, os, sum(secs)::bigint, max(secs)::bigint, count(*)
 		FROM d WHERE secs > 0 GROUP BY namespace, title_id, client, os
 		ORDER BY namespace, title_id, client, os`)
@@ -379,20 +382,16 @@ func (s *Service) Playtime(ctx context.Context) ([]PlayTally, error) {
 	return out, rows.Err()
 }
 
-// OnlinePlayer is one player a game server has connected right now.
+// OnlinePlayer is one player a game server just let in.
 type OnlinePlayer struct{ AccountID, Namespace, TitleID string }
 
 // MaxOnlineMarks caps one MarkOnline call.
 const MaxOnlineMarks = 1000
 
-// onlineGap is the longest gap between two marks that still counts as one
-// stretch online; game servers mark every ~30 s, so one missed mark is fine.
-const onlineGap = 90 * time.Second
-
-// MarkOnline adds, for each player, the time since their previous mark to their
-// live titled presence session in that namespace. The first mark only starts the
-// clock. Players with no such session are skipped (they are counted in neither
-// the result nor the playtime); a malformed account id is skipped too.
+// MarkOnline records that each player reached a game server: their live titled
+// presence session in that namespace starts counting playtime now, unless it
+// already was. Players with no such session, or a malformed account id, are
+// skipped and not counted in the result.
 func (s *Service) MarkOnline(ctx context.Context, players []OnlinePlayer) (int, error) {
 	if len(players) > MaxOnlineMarks {
 		return 0, ErrInvalid
@@ -402,14 +401,10 @@ func (s *Service) MarkOnline(ctx context.Context, players []OnlinePlayer) (int, 
 		if !uuidRe.MatchString(p.AccountID) || p.Namespace == "" {
 			continue
 		}
-		tag, err := s.pool.Exec(ctx, `UPDATE adapter_sessions SET
-				online_seconds = online_seconds + CASE
-					WHEN online_seen_at IS NOT NULL AND now() - online_seen_at <= make_interval(secs => $4)
-					THEN extract(epoch FROM now() - online_seen_at)::int ELSE 0 END,
-				online_seen_at = now()
+		tag, err := s.pool.Exec(ctx, `UPDATE adapter_sessions SET online_since = COALESCE(online_since, now())
 			WHERE account_id = $1::uuid AND namespace = $2 AND title_id <> ''
 			  AND ($3 = '' OR title_id = $3) AND expires_at > now()`,
-			p.AccountID, p.Namespace, p.TitleID, onlineGap.Seconds())
+			p.AccountID, p.Namespace, p.TitleID)
 		if err != nil {
 			return marked, err
 		}

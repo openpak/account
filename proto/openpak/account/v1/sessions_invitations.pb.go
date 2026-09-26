@@ -1347,7 +1347,7 @@ func (x *RejectInvitationResponse) GetRejected() bool {
 
 type MarkOnlineRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Players       []*OnlinePlayer        `protobuf:"bytes,1,rep,name=players,proto3" json:"players,omitempty"` // capped at 1000 per call
+	Players       []*OnlinePlayer        `protobuf:"bytes,1,rep,name=players,proto3" json:"players,omitempty"` // capped at 1000 per call; usually the one logging in
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1580,8 +1580,8 @@ type PlaytimeTally struct {
 	TitleId   string                 `protobuf:"bytes,2,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
 	Client    string                 `protobuf:"bytes,3,opt,name=client,proto3" json:"client,omitempty"`
 	Os        string                 `protobuf:"bytes,4,opt,name=os,proto3" json:"os,omitempty"`
-	// Seconds a game server confirmed the player online (MarkOnline), not the
-	// time the title was merely open.
+	// Seconds from the first game-server login of a session (MarkOnline) to its
+	// end, not the time the title was merely open.
 	TotalSeconds   int64 `protobuf:"varint,5,opt,name=total_seconds,json=totalSeconds,proto3" json:"total_seconds,omitempty"`       // every session added up
 	LongestSeconds int64 `protobuf:"varint,6,opt,name=longest_seconds,json=longestSeconds,proto3" json:"longest_seconds,omitempty"` // the longest single session
 	Sessions       int32 `protobuf:"varint,7,opt,name=sessions,proto3" json:"sessions,omitempty"`

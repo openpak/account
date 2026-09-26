@@ -59,10 +59,10 @@ type SessionsClient interface {
 	// finished session plus the live ones. The website marks a title tested on a
 	// console or emulator from this. Aggregates only, no accounts.
 	GetPlaytime(ctx context.Context, in *GetPlaytimeRequest, opts ...grpc.CallOption) (*GetPlaytimeResponse, error)
-	// A game server saying these players are connected to it right now. Sent
-	// every ~30 s for everyone connected; each mark adds the time since the
-	// player's previous mark (up to 90 s) to their live presence session in that
-	// namespace, which is what GetPlaytime counts. A player with no live titled
+	// A game server (through nx-baas or nn-account, at the player's login) saying
+	// these players reached it. Their live titled presence session in that
+	// namespace counts playtime from the first such mark until it ends; a session
+	// that never reached a game server counts none. A player with no live titled
 	// session is skipped: the client and OS come from presence.
 	MarkOnline(ctx context.Context, in *MarkOnlineRequest, opts ...grpc.CallOption) (*MarkOnlineResponse, error)
 }
@@ -185,10 +185,10 @@ type SessionsServer interface {
 	// finished session plus the live ones. The website marks a title tested on a
 	// console or emulator from this. Aggregates only, no accounts.
 	GetPlaytime(context.Context, *GetPlaytimeRequest) (*GetPlaytimeResponse, error)
-	// A game server saying these players are connected to it right now. Sent
-	// every ~30 s for everyone connected; each mark adds the time since the
-	// player's previous mark (up to 90 s) to their live presence session in that
-	// namespace, which is what GetPlaytime counts. A player with no live titled
+	// A game server (through nx-baas or nn-account, at the player's login) saying
+	// these players reached it. Their live titled presence session in that
+	// namespace counts playtime from the first such mark until it ends; a session
+	// that never reached a game server counts none. A player with no live titled
 	// session is skipped: the client and OS come from presence.
 	MarkOnline(context.Context, *MarkOnlineRequest) (*MarkOnlineResponse, error)
 	mustEmbedUnimplementedSessionsServer()

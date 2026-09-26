@@ -10,11 +10,12 @@ import (
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
 
-// Playtime is time a game server confirmed, not time a title sat open: presence
-// alone counts nothing, each MarkOnline adds the time since the previous one (a
-// long gap adds nothing), the OS rides with the session, a reconnect after a dead
-// lease is a new session, and an expiry carries the online time into the record.
-func TestPlaytimeFromGameServerMarks(t *testing.T) {
+// Playtime runs from a session's first game-server login (MarkOnline) to its end:
+// presence alone counts nothing however long the title is open, a second login
+// in the same session does not restart the clock, a reconnect after a dead lease
+// is a new session that needs its own login, and an expiry carries the time into
+// the record.
+func TestPlaytimeFromGameServerLogin(t *testing.T) {
 	_, _, _, sc, _, _, ident := startGRPC(t)
 	ctx := authCtx()
 	pool, err := storage.Connect(context.Background(), testDBURL)
@@ -36,7 +37,7 @@ func TestPlaytimeFromGameServerMarks(t *testing.T) {
 		}
 		return r.GetSessionId()
 	}
-	mark := func(want int32) {
+	login := func(want int32) {
 		t.Helper()
 		r, err := sc.MarkOnline(ctx, &accountv1.MarkOnlineRequest{Players: []*accountv1.OnlinePlayer{
 			{AccountId: a.ID, Namespace: "switch"},
@@ -46,11 +47,11 @@ func TestPlaytimeFromGameServerMarks(t *testing.T) {
 			t.Fatalf("mark: %v %v, want %d", r, err, want)
 		}
 	}
-	// ago pretends the previous mark was some seconds back.
-	ago := func(secs int) {
+	// minutes pretends the live session reached the game server that long ago and was renewed just now.
+	minutes := func(m int) {
 		t.Helper()
-		if _, err := pool.Exec(context.Background(), `UPDATE adapter_sessions SET online_seen_at = now() - make_interval(secs => $2)
-			WHERE account_id = $1 AND expires_at > now()`, a.ID, secs); err != nil {
+		if _, err := pool.Exec(context.Background(), `UPDATE adapter_sessions SET online_since = now() - make_interval(mins => $2), updated_at = now()
+			WHERE account_id = $1 AND expires_at > now()`, a.ID, m); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -63,7 +64,7 @@ func TestPlaytimeFromGameServerMarks(t *testing.T) {
 		return r.GetTallies()
 	}
 
-	mark(0) // no presence yet: nothing to mark
+	login(0) // no presence yet: nothing to mark
 	register()
 	if _, err := pool.Exec(context.Background(), `UPDATE adapter_sessions SET created_at = now() - interval '2 hours' WHERE account_id = $1`, a.ID); err != nil {
 		t.Fatal(err)
@@ -72,29 +73,26 @@ func TestPlaytimeFromGameServerMarks(t *testing.T) {
 		t.Fatalf("two hours on the title screen counted: %+v", got)
 	}
 
-	mark(1) // starts the clock
-	ago(60)
-	mark(1) // +60
-	ago(600)
-	mark(1) // a ten-minute gap is not one stretch online: +0
-	ago(30)
-	mark(1) // +30
+	login(1)
+	minutes(20)
+	login(1) // a second login does not restart the clock
 	got := tallies()
-	if len(got) != 1 || got[0].GetOs() != "macos" || got[0].GetClient() != "ryujinx" || got[0].GetTotalSeconds() < 90 || got[0].GetTotalSeconds() > 95 {
-		t.Fatalf("after marks: %+v", got)
+	if len(got) != 1 || got[0].GetOs() != "macos" || got[0].GetClient() != "ryujinx" || got[0].GetLongestSeconds() < 20*60 {
+		t.Fatalf("after login: %+v", got)
 	}
 
-	// The lease runs out and the game reconnects: a new session, the old one's
-	// online time is kept.
+	// The lease runs out and the game reconnects: a new session, not counting
+	// until it reaches a game server again; the old one's time is kept.
 	if _, err := pool.Exec(context.Background(), `UPDATE adapter_sessions SET expires_at = now() - interval '1 minute' WHERE account_id = $1`, a.ID); err != nil {
 		t.Fatal(err)
 	}
 	id := register()
-	mark(1)
-	ago(45)
-	mark(1)
-	got = tallies()
-	if len(got) != 1 || got[0].GetSessions() != 2 || got[0].GetTotalSeconds() < 135 || got[0].GetLongestSeconds() > 95 {
+	if got = tallies(); len(got) != 1 || got[0].GetSessions() != 1 {
+		t.Fatalf("reconnect counted before a login: %+v", got)
+	}
+	login(1)
+	minutes(10)
+	if got = tallies(); len(got) != 1 || got[0].GetSessions() != 2 || got[0].GetTotalSeconds() < 30*60 || got[0].GetLongestSeconds() >= 21*60 {
 		t.Fatalf("after reconnect: %+v", got)
 	}
 
@@ -104,7 +102,7 @@ func TestPlaytimeFromGameServerMarks(t *testing.T) {
 	}
 	var n, secs int
 	_ = pool.QueryRow(context.Background(), `SELECT count(*), coalesce(sum(online_seconds), 0) FROM play_sessions`).Scan(&n, &secs)
-	if got = tallies(); n != 2 || secs < 135 || len(got) != 1 || got[0].GetTotalSeconds() != int64(secs) {
+	if got = tallies(); n != 2 || secs < 30*60 || len(got) != 1 || got[0].GetTotalSeconds() != int64(secs) {
 		t.Fatalf("after expiry: %d rows %d s, %+v", n, secs, got)
 	}
 }

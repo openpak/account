@@ -68,6 +68,7 @@ DELETE FROM schema_migrations WHERE name = '0010_federation.sql';
 DELETE FROM schema_migrations WHERE name = '0018_session_client.sql';
 DELETE FROM schema_migrations WHERE name = '0019_play_sessions.sql';
 DELETE FROM schema_migrations WHERE name = '0020_online_seconds.sql';
+DELETE FROM schema_migrations WHERE name = '0021_online_since.sql';
 DROP TABLE federation_nodes;`
 	const seedOldRows = `
 INSERT INTO adapter_sessions (session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
