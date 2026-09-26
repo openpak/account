@@ -19,7 +19,7 @@ func (s *Server) RegisterSession(ctx context.Context, req *accountv1.RegisterSes
 		return nil, err
 	}
 	id, lease, err := s.sessions.Register(ctx, req.GetAccountId(), req.GetNamespace(),
-		req.GetTitleId(), req.GetEndpointRef(), NodeFromContext(ctx), time.Duration(req.GetLeaseSeconds())*time.Second, req.GetClient())
+		req.GetTitleId(), req.GetEndpointRef(), NodeFromContext(ctx), time.Duration(req.GetLeaseSeconds())*time.Second, req.GetClient(), req.GetOs())
 	if err != nil {
 		return nil, mapSessionErr(err)
 	}
@@ -148,7 +148,7 @@ func (s *Server) GetPresence(ctx context.Context, req *accountv1.GetPresenceRequ
 	resp := &accountv1.GetPresenceResponse{}
 	for _, p := range ps {
 		resp.Presence = append(resp.Presence, &accountv1.Presence{
-			AccountId: p.AccountID, Namespace: p.Namespace, TitleId: p.TitleID, SinceUnix: p.SinceUnix, NodeId: p.NodeID, Client: p.Client,
+			AccountId: p.AccountID, Namespace: p.Namespace, TitleId: p.TitleID, SinceUnix: p.SinceUnix, NodeId: p.NodeID, Client: p.Client, Os: p.OS,
 		})
 	}
 	return resp, nil
@@ -213,6 +213,26 @@ func (s *Server) GetPlayerCounts(ctx context.Context, _ *accountv1.GetPlayerCoun
 	}
 	for _, n := range nodes {
 		resp.Nodes = append(resp.Nodes, &accountv1.NodePlayers{NodeId: n.NodeID, Players: int32(n.Players)})
+	}
+	return resp, nil
+}
+
+// GetPlaytime answers how long each title has been played on each client and
+// OS. Aggregates only; no account appears in it.
+func (s *Server) GetPlaytime(ctx context.Context, _ *accountv1.GetPlaytimeRequest) (*accountv1.GetPlaytimeResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	ts, err := s.sessions.Playtime(ctx)
+	if err != nil {
+		return nil, mapSessionErr(err)
+	}
+	resp := &accountv1.GetPlaytimeResponse{}
+	for _, t := range ts {
+		resp.Tallies = append(resp.Tallies, &accountv1.PlaytimeTally{
+			Namespace: t.Namespace, TitleId: t.TitleID, Client: t.Client, Os: t.OS,
+			TotalSeconds: t.TotalSeconds, LongestSeconds: t.LongestSeconds, Sessions: int32(t.Sessions),
+		})
 	}
 	return resp, nil
 }

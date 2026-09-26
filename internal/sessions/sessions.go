@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -39,6 +40,10 @@ type Service struct{ pool *pgxpool.Pool }
 
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
+// OSes are the operating systems a session may name; "" is a console, or an
+// emulator that did not say.
+var OSes = []string{"", "windows", "macos", "linux", "android", "ios"}
+
 // MaxClientLen caps the client label an adapter may attach to a session.
 const MaxClientLen = 64
 
@@ -46,12 +51,15 @@ const MaxClientLen = 64
 // same (account, namespace, title). Returns the server-assigned session ID and
 // the applied lease. client names what the person is on inside the namespace
 // ("ryujinx", "switch", "cemu", ...); empty means the adapter could not tell.
-func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, endpointRef, nodeID string, lease time.Duration, client string) (string, time.Duration, error) {
+func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, endpointRef, nodeID string, lease time.Duration, client, os string) (string, time.Duration, error) {
 	// titleID may be empty, and that is a fact rather than a gap: it means signed in to this
 	// network and not in any title. Being online and playing something are different things and
 	// the status page reports them separately, so the distinction has to survive down here.
 	if accountID == "" || namespace == "" || endpointRef == "" || nodeID == "" || len(client) > MaxClientLen {
 		return "", 0, ErrInvalid
+	}
+	if !slices.Contains(OSes, os) {
+		os = "" // a label, not worth refusing a session over
 	}
 	if lease <= 0 {
 		lease = DefaultLease
@@ -75,16 +83,17 @@ func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, e
 	// Switch and on a Wii U at once (both title-less) are two rows, not one
 	// row the two adapters keep taking from each other.
 	if _, err := s.pool.Exec(ctx, `INSERT INTO adapter_sessions
-		(session_id, account_id, namespace, title_id, endpoint_ref, node_id, client, expires_at)
-		VALUES ($1,$2,$3,$4,$5,$7,$8, now() + make_interval(secs => $6))
+		(session_id, account_id, namespace, title_id, endpoint_ref, node_id, client, os, expires_at)
+		VALUES ($1,$2,$3,$4,$5,$7,$8,$9, now() + make_interval(secs => $6))
 		ON CONFLICT (account_id, namespace, title_id) DO UPDATE SET
 			session_id = EXCLUDED.session_id,
 			endpoint_ref = EXCLUDED.endpoint_ref,
 			node_id = EXCLUDED.node_id,
 			client = EXCLUDED.client,
+			os = EXCLUDED.os,
 			expires_at = EXCLUDED.expires_at,
 			updated_at = now()`,
-		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds()), nodeID, client); err != nil {
+		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds()), nodeID, client, os); err != nil {
 		return "", 0, fmt.Errorf("sessions: register: %w", err)
 	}
 	return id, lease, nil
@@ -194,6 +203,7 @@ type Presence struct {
 	SinceUnix int64
 	NodeID    string
 	Client    string
+	OS        string
 }
 
 // MaxPresenceAccounts caps one presence query. A friends list is the caller.
@@ -213,7 +223,7 @@ func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Prese
 		return nil, ErrInvalid
 	}
 	rows, err := s.pool.Query(ctx, `SELECT DISTINCT ON (account_id)
-			account_id, namespace, title_id, extract(epoch FROM created_at)::bigint, node_id, client
+			account_id, namespace, title_id, extract(epoch FROM created_at)::bigint, node_id, client, os
 		FROM adapter_sessions
 		WHERE account_id = ANY($1::uuid[]) AND expires_at > now()
 		ORDER BY account_id, (title_id <> '') DESC, created_at DESC`, accountIDs)
@@ -224,7 +234,7 @@ func (s *Service) GetPresence(ctx context.Context, accountIDs []string) ([]Prese
 	var out []Presence
 	for rows.Next() {
 		var p Presence
-		if err := rows.Scan(&p.AccountID, &p.Namespace, &p.TitleID, &p.SinceUnix, &p.NodeID, &p.Client); err != nil {
+		if err := rows.Scan(&p.AccountID, &p.Namespace, &p.TitleID, &p.SinceUnix, &p.NodeID, &p.Client, &p.OS); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -332,4 +342,40 @@ type NodePlayers struct {
 type NetworkPlayers struct {
 	Namespace string
 	Players   int
+}
+
+// PlayTally is how long one title has been played on one client and OS.
+type PlayTally struct {
+	Namespace, TitleID, Client, OS string
+	TotalSeconds, LongestSeconds   int64
+	Sessions                       int
+}
+
+// Playtime adds up every finished session (play_sessions, written by the
+// 0019 trigger) and every session still in adapter_sessions, live or ended
+// and not yet reaped, each counted from its start to its last renewal.
+// Title-less sessions are being online, not playing, so they are left out.
+func (s *Service) Playtime(ctx context.Context) ([]PlayTally, error) {
+	rows, err := s.pool.Query(ctx, `WITH d AS (
+			SELECT namespace, title_id, client, os, extract(epoch FROM ended_at - started_at) AS secs
+			FROM play_sessions
+			UNION ALL
+			SELECT namespace, title_id, client, os, extract(epoch FROM updated_at - created_at)
+			FROM adapter_sessions WHERE title_id <> '' AND updated_at > created_at)
+		SELECT namespace, title_id, client, os, sum(secs)::bigint, max(secs)::bigint, count(*)
+		FROM d GROUP BY namespace, title_id, client, os
+		ORDER BY namespace, title_id, client, os`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PlayTally
+	for rows.Next() {
+		var t PlayTally
+		if err := rows.Scan(&t.Namespace, &t.TitleID, &t.Client, &t.OS, &t.TotalSeconds, &t.LongestSeconds, &t.Sessions); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }

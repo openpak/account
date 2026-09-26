@@ -477,7 +477,7 @@ func TestInvitationPollSingleConnection(t *testing.T) {
 	if _, err := soc.AcceptFriend(ctx, bID, aID, "k"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := sess.Register(ctx, bID, "switch", "t", "ep", "home", 30*time.Second, ""); err != nil {
+	if _, _, err := sess.Register(ctx, bID, "switch", "t", "ep", "home", 30*time.Second, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := inv.Send(ctx, aID, bID, "t", []byte("hey"), time.Minute); err != nil {

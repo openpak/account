@@ -3,6 +3,15 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.11.0 — 2026-09-26
+
+- Playtime per title, client and OS: `RegisterSessionRequest.os` / `Presence.os` (windows, macos,
+  linux, android, ios; empty for a console), table `play_sessions` filled by a trigger whenever a
+  session ends (deleted, or registered over after its lease ran out or from another client/OS),
+  and `Sessions.GetPlaytime` adding finished and live sessions up per combination. The website
+  marks a title tested from it. A reconnect after a dead lease now restarts `created_at`, so
+  presence no longer reports "since" a session that ended.
+
 ## v0.10.1 — 2026-09-24
 
 - deps: grpc 1.83.2, x/crypto 0.57, x/net 0.59, pgx 5.11 (Dependabot)

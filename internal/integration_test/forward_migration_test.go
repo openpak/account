@@ -66,6 +66,7 @@ CREATE INDEX idx_invitations_to ON invitations(to_id, namespace, state);
 DELETE FROM schema_migrations WHERE name = '0007_invitation_sessions_forward.sql';
 DELETE FROM schema_migrations WHERE name = '0010_federation.sql';
 DELETE FROM schema_migrations WHERE name = '0018_session_client.sql';
+DELETE FROM schema_migrations WHERE name = '0019_play_sessions.sql';
 DROP TABLE federation_nodes;`
 	const seedOldRows = `
 INSERT INTO adapter_sessions (session_id, account_id, namespace, title_id, endpoint_ref, expires_at)
@@ -109,7 +110,7 @@ VALUES ('44444444-4444-4444-4444-444444444444','11111111-1111-1111-1111-11111111
 
 	// Registration upserts on the migrated schema.
 	svc := sessions.New(pool)
-	id, lease, err := svc.Register(ctx, "11111111-1111-1111-1111-111111111111", "switch", "t", "ep-new", "home", 30*time.Second, "")
+	id, lease, err := svc.Register(ctx, "11111111-1111-1111-1111-111111111111", "switch", "t", "ep-new", "home", 30*time.Second, "", "")
 	if err != nil || id == "" || lease <= 0 {
 		t.Fatalf("register on migrated schema: %q %v %v", id, lease, err)
 	}
