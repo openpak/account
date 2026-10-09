@@ -187,8 +187,8 @@ func TestTwoFactor(t *testing.T) {
 	if err != nil || !sf.GetRecoveryCodeUsed() || sf.GetRecoveryCodesLeft() != 8 {
 		t.Fatalf("second factor by recovery code: %+v %v", sf, err)
 	}
-	if ga, err := idc.GetAccount(gctx, &accountv1.GetAccountRequest{AccountId: id}); err != nil || !ga.GetTwoFactorEnabled() {
-		t.Fatalf("GetAccount two_factor_enabled: %+v %v", ga, err)
+	if ga, err := idc.GetAccount(gctx, &accountv1.GetAccountRequest{AccountId: id}); err != nil || !ga.GetTwoFactorEnabled() || ga.GetEmail() == "" {
+		t.Fatalf("GetAccount two_factor_enabled, email: %v %v", ga.GetTwoFactorEnabled(), err)
 	}
 
 	// Disable: password and a code.

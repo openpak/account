@@ -269,6 +269,7 @@ func (s *Server) GetAccount(ctx context.Context, req *accountv1.GetAccountReques
 		DisplayName:      a.DisplayName,
 		Country:          a.Country,
 		Birthday:         a.Birthday,
+		Email:            a.Email,
 	}, nil
 }
 

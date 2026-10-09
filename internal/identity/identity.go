@@ -262,10 +262,10 @@ func (s *Service) GetByID(ctx context.Context, id string) (*Account, error) {
 	// the phone app, the Switch adapter -- showed them empty because they were
 	// not selected here, and a console user object with country "" is not one
 	// a console will take.
-	err := s.pool.QueryRow(ctx, `SELECT id, display_name, status, email_verified_at, created_at,
+	err := s.pool.QueryRow(ctx, `SELECT id, email, display_name, status, email_verified_at, created_at,
 		COALESCE(country, ''), COALESCE(birthday::text, '')
 		FROM accounts WHERE id = $1 AND status <> 'deleted'`, id).
-		Scan(&a.ID, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday)
+		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
