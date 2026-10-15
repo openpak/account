@@ -64,6 +64,7 @@ func startGRPC(t *testing.T) (accountv1.IdentityClient, accountv1.LinksClient, a
 	accountv1.RegisterIdentityServer(srv, api)
 	accountv1.RegisterLinksServer(srv, api)
 	accountv1.RegisterEventsServer(srv, api)
+	accountv1.RegisterRegistrationServer(srv, api)
 	accountv1.RegisterSocialServer(srv, api)
 	accountv1.RegisterSessionsServer(srv, api)
 	accountv1.RegisterInvitationsServer(srv, api)

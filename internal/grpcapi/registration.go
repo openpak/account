@@ -2,6 +2,7 @@ package grpcapi
 
 import (
 	"context"
+	"errors"
 	"openpak/account/internal/emaillink"
 	"strings"
 
@@ -52,4 +53,25 @@ func (s *Server) RegisterAccount(ctx context.Context, req *accountv1.RegisterAcc
 		return nil, status.Error(codes.Internal, "verification email could not be queued")
 	}
 	return resp, nil
+}
+
+// SetDisplayName implements the adapter-delegated rename: the name a person
+// chose on a console becomes the account's.
+func (s *Server) SetDisplayName(ctx context.Context, req *accountv1.SetDisplayNameRequest) (*accountv1.SetDisplayNameResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	if req.GetCallerNamespace() == "" || req.GetAccountId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "caller_namespace and account_id are required")
+	}
+	switch err := s.identity.SetDisplayName(ctx, req.GetAccountId(), req.GetDisplayName()); {
+	case err == nil:
+		return &accountv1.SetDisplayNameResponse{}, nil
+	case errors.Is(err, identity.ErrNotFound):
+		return nil, status.Error(codes.NotFound, "no active account")
+	case errors.Is(err, identity.ErrBadDisplayName):
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	default:
+		return nil, status.Error(codes.Internal, "internal error")
+	}
 }

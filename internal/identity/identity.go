@@ -129,6 +129,27 @@ type Profile struct {
 	DisplayName string
 }
 
+// ErrBadDisplayName is the 1-32 character rule SetDisplayName shares with registration.
+var ErrBadDisplayName = errors.New("identity: display name must be 1-32 characters")
+
+// SetDisplayName renames an active account.
+func (s *Service) SetDisplayName(ctx context.Context, accountID, displayName string) error {
+	dn := strings.TrimSpace(displayName)
+	if dn == "" || len(dn) > 32 {
+		return ErrBadDisplayName
+	}
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE accounts SET display_name = $2, updated_at = now() WHERE id = $1 AND status = 'active'`,
+		accountID, dn)
+	if err != nil {
+		return fmt.Errorf("identity: set display name: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Service) Register(ctx context.Context, email, password, displayName string) (*Account, string, error) {
 	return s.RegisterWithProfile(ctx, email, password, displayName, Profile{})
 }
