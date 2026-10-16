@@ -37,7 +37,12 @@ type Session struct {
 	Client      string
 }
 
-type Service struct{ pool *pgxpool.Pool }
+type Service struct {
+	pool *pgxpool.Pool
+	// OnChange, when set, is told that an account's presence moved: a session began or ended.
+	// It must not block; the fan-out to friends belongs to the caller.
+	OnChange func(accountID string)
+}
 
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
@@ -77,6 +82,12 @@ func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, e
 	if !active {
 		return "", 0, ErrAccountUnknown
 	}
+	var wasLive bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM adapter_sessions
+		WHERE account_id=$1 AND namespace=$2 AND title_id=$3 AND expires_at > now())`,
+		accountID, namespace, titleID).Scan(&wasLive); err != nil {
+		return "", 0, err
+	}
 	id := newUUID()
 	// Atomic replacement: the unique (account_id, namespace, title_id) key
 	// backs an upsert, so concurrent registrations converge on exactly one
@@ -96,6 +107,9 @@ func (s *Service) Register(ctx context.Context, accountID, namespace, titleID, e
 			updated_at = now()`,
 		id, accountID, namespace, titleID, endpointRef, int(lease.Seconds()), nodeID, client, os); err != nil {
 		return "", 0, fmt.Errorf("sessions: register: %w", err)
+	}
+	if !wasLive && s.OnChange != nil { // a renewal changes nothing a friend can see
+		s.OnChange(accountID)
 	}
 	return id, lease, nil
 }
@@ -143,8 +157,34 @@ func (s *Service) Expire(ctx context.Context, sessionID string) error {
 	if sessionID == "" {
 		return ErrInvalid
 	}
-	_, err := s.pool.Exec(ctx, `DELETE FROM adapter_sessions WHERE session_id=$1`, sessionID)
+	var accountID string
+	err := s.pool.QueryRow(ctx, `DELETE FROM adapter_sessions WHERE session_id=$1 RETURNING account_id`, sessionID).Scan(&accountID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err == nil && s.OnChange != nil {
+		s.OnChange(accountID)
+	}
 	return err
+}
+
+// LiveAccounts lists the accounts with at least one unexpired session. The caller diffs two
+// readings to find who lapsed: a lease running out is not an event anywhere else.
+func (s *Service) LiveAccounts(ctx context.Context) (map[string]bool, error) {
+	rows, err := s.pool.Query(ctx, `SELECT DISTINCT account_id::text FROM adapter_sessions WHERE expires_at > now()`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
 }
 
 // Resolve returns the live session for (account, title), if any. Expired
@@ -378,6 +418,52 @@ func (s *Service) Playtime(ctx context.Context) ([]PlayTally, error) {
 			return nil, err
 		}
 		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// PlayHistoryEntry is one title in an account's history.
+type PlayHistoryEntry struct {
+	TitleID                 string
+	Sessions                int
+	TotalSeconds            int64
+	FirstPlayed, LastPlayed int64
+}
+
+// MaxPlayHistory is how many titles a console's friend page keeps.
+const MaxPlayHistory = 20
+
+// PlayHistory is what an account played in a namespace, newest title first: every finished session
+// (play_sessions) and the one still running (adapter_sessions), per title. Unlike Playtime it counts a
+// session whether or not it reached a game server, since a play log is about the title having run.
+func (s *Service) PlayHistory(ctx context.Context, accountID, namespace string, limit int) ([]PlayHistoryEntry, error) {
+	if !uuidRe.MatchString(accountID) || namespace == "" {
+		return nil, ErrInvalid
+	}
+	if limit <= 0 || limit > MaxPlayHistory {
+		limit = MaxPlayHistory
+	}
+	rows, err := s.pool.Query(ctx, `WITH d AS (
+			SELECT title_id, started_at, ended_at FROM play_sessions
+			WHERE account_id = $1::uuid AND namespace = $2 AND title_id <> ''
+			UNION ALL
+			SELECT title_id, created_at, updated_at FROM adapter_sessions
+			WHERE account_id = $1::uuid AND namespace = $2 AND title_id <> '' AND expires_at > now())
+		SELECT title_id, count(*)::int,
+			GREATEST(0, sum(extract(epoch FROM ended_at - started_at)))::bigint,
+			extract(epoch FROM min(started_at))::bigint, extract(epoch FROM max(ended_at))::bigint
+		FROM d GROUP BY title_id ORDER BY max(ended_at) DESC LIMIT $3`, accountID, namespace, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PlayHistoryEntry
+	for rows.Next() {
+		var e PlayHistoryEntry
+		if err := rows.Scan(&e.TitleID, &e.Sessions, &e.TotalSeconds, &e.FirstPlayed, &e.LastPlayed); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
 	}
 	return out, rows.Err()
 }

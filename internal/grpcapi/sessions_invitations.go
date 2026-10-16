@@ -237,6 +237,25 @@ func (s *Server) GetPlaytime(ctx context.Context, _ *accountv1.GetPlaytimeReques
 	return resp, nil
 }
 
+// GetPlayHistory is one account's titles and play time in a namespace; see sessions.PlayHistory.
+func (s *Server) GetPlayHistory(ctx context.Context, req *accountv1.GetPlayHistoryRequest) (*accountv1.GetPlayHistoryResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	entries, err := s.sessions.PlayHistory(ctx, req.GetAccountId(), req.GetNamespace(), int(req.GetLimit()))
+	if err != nil {
+		return nil, mapSessionErr(err)
+	}
+	resp := &accountv1.GetPlayHistoryResponse{}
+	for _, e := range entries {
+		resp.Entries = append(resp.Entries, &accountv1.PlayHistoryEntry{
+			TitleId: e.TitleID, Sessions: int32(e.Sessions), TotalSeconds: e.TotalSeconds,
+			FirstPlayedUnix: e.FirstPlayed, LastPlayedUnix: e.LastPlayed,
+		})
+	}
+	return resp, nil
+}
+
 // MarkOnline is a game server confirming who is connected to it; see sessions.MarkOnline.
 func (s *Server) MarkOnline(ctx context.Context, req *accountv1.MarkOnlineRequest) (*accountv1.MarkOnlineResponse, error) {
 	if err := s.authorize(ctx); err != nil {

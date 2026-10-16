@@ -80,6 +80,36 @@ func run() error {
 	lnks := links.New(pool, evSvc)
 	socSvc := social.New(pool, evSvc)
 	sessSvc := sessions.New(pool)
+	// Presence reaches friends as events: a session beginning or ending tells the networks where
+	// the person's friends are online (events.PresenceChanged); a lease that lapses is found by
+	// diffing who is live every few seconds.
+	sessSvc.OnChange = func(accountID string) {
+		go func() {
+			c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := evSvc.PresenceChanged(c, accountID); err != nil {
+				log.Printf("presence fan-out: %v", err)
+			}
+		}()
+	}
+	go func() {
+		var prev map[string]bool
+		for {
+			time.Sleep(5 * time.Second)
+			c, cancel := context.WithTimeout(ctx, 5*time.Second)
+			live, err := sessSvc.LiveAccounts(c)
+			cancel()
+			if err != nil {
+				continue
+			}
+			for id := range prev {
+				if !live[id] {
+					sessSvc.OnChange(id)
+				}
+			}
+			prev = live
+		}
+	}()
 	invSvc := invitations.New(pool, socSvc, sessionRefResolver{sessSvc}, evSvc)
 
 	// Outbound email. Production REQUIRES SMTP configuration: registration

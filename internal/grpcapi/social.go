@@ -54,7 +54,7 @@ func (s *Server) ListFriends(ctx context.Context, req *accountv1.ListFriendsRequ
 	}
 	resp := &accountv1.ListFriendsResponse{}
 	for _, f := range friends {
-		resp.Friends = append(resp.Friends, &accountv1.Friend{AccountId: f.AccountID, DisplayName: f.DisplayName})
+		resp.Friends = append(resp.Friends, &accountv1.Friend{AccountId: f.AccountID, DisplayName: f.DisplayName, LastSeenUnix: f.LastSeenUnix, FriendsSinceUnix: f.FriendsSinceUnix})
 	}
 	return resp, nil
 }

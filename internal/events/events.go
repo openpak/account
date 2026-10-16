@@ -33,6 +33,7 @@ var KnownTypes = map[string]bool{
 	"invitation_sent":        true,
 	"message":                true,
 	"email_changed":          true,
+	"presence_changed":       true,
 }
 
 type Service struct {
@@ -202,4 +203,39 @@ func (h *hub) wait() <-chan struct{} {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.ch
+}
+
+// PresenceChanged tells the friends of accountID who are online somewhere that its presence moved:
+// one presence_changed per (friend, network the friend has a live session on), subject the account.
+// A friend offline everywhere gets nothing and reads presence when it next signs in.
+func (s *Service) PresenceChanged(ctx context.Context, accountID string) error {
+	rows, err := s.pool.Query(ctx, `SELECT DISTINCT s.account_id, s.namespace
+		FROM friendships f
+		JOIN adapter_sessions s
+		  ON s.account_id = CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END
+		WHERE f.state = 'accepted' AND (f.requester_id = $1 OR f.addressee_id = $1)
+		  AND s.expires_at > now()`, accountID)
+	if err != nil {
+		return fmt.Errorf("events: presence fan-out: %w", err)
+	}
+	type target struct{ account, namespace string }
+	var targets []target
+	for rows.Next() {
+		var t target
+		if err := rows.Scan(&t.account, &t.namespace); err != nil {
+			rows.Close()
+			return err
+		}
+		targets = append(targets, t)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, t := range targets {
+		if err := s.Emit(ctx, "presence_changed", t.account, t.namespace, accountID); err != nil {
+			return err
+		}
+	}
+	return nil
 }

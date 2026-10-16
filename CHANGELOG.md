@@ -1,7 +1,26 @@
 # Changelog — account
 
+> **Current Switch client (2026-10-13): Harbor**, at
+> `~/REPOS/Openpak/emulators/harbor`. Harbor is an independent
+> OpenPak project based on Eden. Citron, Ryujinx (desktop and Android), and
+> the former OpenPak Eden checkouts have been removed. References to those
+> forks below record historical evidence only: do not run their commands,
+> reinstall them, or select them for current work. Use Harbor's README and
+> current handoff for builds and testing; old results do not establish Harbor parity.
+
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
+
+## v0.16.0 — 2026-10-16
+
+- **Presence is pushed.** `presence_changed` (migration 0022): when a session begins, ends or lapses,
+  the core tells each friend who is online somewhere, once per network that friend is on (account =
+  the friend, namespace = their network, subject = whose presence moved). A network with none of
+  the person's friends online hears nothing. Renewals are not events; lapses are found by diffing
+  who is live every 5 s.
+- Folds in the work that production already ran as local images (2026-10-15): `Identity.ListAccounts`
+  (the account directory for adapter backfills), `Sessions.GetPlayHistory` (a console's Play Activity),
+  and `last_seen_unix` / `friends_since_unix` on `Friend`.
 
 ## v0.13.0 — 2026-09-26
 

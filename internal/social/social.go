@@ -39,8 +39,12 @@ type Friendship struct {
 }
 
 type Friend struct {
-	AccountID   string
-	DisplayName string
+	AccountID    string
+	DisplayName  string
+	LastSeenUnix int64
+	// FriendsSinceUnix is when the friendship was accepted (the accepted row's updated_at: a
+	// request is created pending and only changes when it is answered).
+	FriendsSinceUnix int64
 }
 
 // Relationship is the viewpoint of account on other.
@@ -220,8 +224,13 @@ func (s *Service) RemoveFriend(ctx context.Context, accountID, otherID string) e
 
 // ListFriends returns accepted friends with minimal profile projection.
 func (s *Service) ListFriends(ctx context.Context, accountID string) ([]Friend, error) {
-	rows, err := s.pool.Query(ctx, `SELECT other, acc.display_name FROM (
-		SELECT CASE WHEN requester_id=$1 THEN addressee_id ELSE requester_id END AS other
+	rows, err := s.pool.Query(ctx, `SELECT other, acc.display_name,
+		coalesce(extract(epoch FROM greatest(
+		 (SELECT max(created_at) FROM sessions WHERE account_id=fr.other),
+		 (SELECT max(updated_at) FROM adapter_sessions WHERE account_id=fr.other),
+		 (SELECT max(ended_at) FROM play_sessions WHERE account_id=fr.other)
+		))::bigint,0), extract(epoch FROM fr.since)::bigint FROM (
+		SELECT CASE WHEN requester_id=$1 THEN addressee_id ELSE requester_id END AS other, updated_at AS since
 		FROM friendships WHERE state='accepted' AND (requester_id=$1 OR addressee_id=$1)
 	) fr JOIN accounts acc ON acc.id = fr.other ORDER BY acc.display_name`, accountID)
 	if err != nil {
@@ -231,7 +240,7 @@ func (s *Service) ListFriends(ctx context.Context, accountID string) ([]Friend, 
 	var out []Friend
 	for rows.Next() {
 		var f Friend
-		if err := rows.Scan(&f.AccountID, &f.DisplayName); err != nil {
+		if err := rows.Scan(&f.AccountID, &f.DisplayName, &f.LastSeenUnix, &f.FriendsSinceUnix); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
