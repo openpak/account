@@ -49,6 +49,7 @@ type Account struct {
 	ID            string
 	Email         string
 	DisplayName   string
+	Handle        string
 	Status        Status
 	EmailVerified bool
 	CreatedAt     time.Time
@@ -122,6 +123,7 @@ func validateRegistration(email, password, displayName string) error {
 // Profile is what registration collects beyond credentials. Both fields are required by the
 // Switch's user object, which is rejected outright when either is missing.
 type Profile struct {
+	Handle   string // Set only at creation, never part of editable profile updates.
 	Country  string // ISO 3166-1 alpha-2, e.g. "GB"
 	Birthday string // ISO 8601 date, e.g. "1990-01-01"
 	// DisplayName is what other people see. Empty in an update means "leave it
@@ -155,6 +157,11 @@ func (s *Service) Register(ctx context.Context, email, password, displayName str
 }
 
 func (s *Service) RegisterWithProfile(ctx context.Context, email, password, displayName string, p Profile) (*Account, string, error) {
+	if p.Handle != "" {
+		if err := ValidateHandle(p.Handle); err != nil {
+			return nil, "", err
+		}
+	}
 	if err := validateRegistration(email, password, displayName); err != nil {
 		return nil, "", err
 	}
@@ -171,10 +178,22 @@ func (s *Service) RegisterWithProfile(ctx context.Context, email, password, disp
 	if p.Birthday != "" {
 		birthday = p.Birthday
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name, country, birthday)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)`, id, strings.TrimSpace(email), normalized, string(hash),
-		strings.TrimSpace(displayName), p.Country, birthday)
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		_, e := tx.Exec(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name, country, birthday, handle)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''))`, id, strings.TrimSpace(email), normalized, string(hash), strings.TrimSpace(displayName), p.Country, birthday, p.Handle)
+		if e != nil {
+			return e
+		}
+		if s.emitter != nil && p.Handle != "" {
+			return s.emitter.EmitTx(ctx, tx, "account_created", id, "", "")
+		}
+		return nil
+	})
 	if err != nil {
+		mapped := mapHandleError(err)
+		if mapped != err {
+			return nil, "", mapped
+		}
 		if isUniqueViolation(err) {
 			return nil, "", ErrEmailTaken
 		}
@@ -185,7 +204,7 @@ func (s *Service) RegisterWithProfile(ctx context.Context, email, password, disp
 		return nil, "", err
 	}
 	return &Account{ID: id, Email: strings.TrimSpace(email), DisplayName: strings.TrimSpace(displayName),
-		Country: p.Country, Birthday: p.Birthday, Status: StatusActive}, token, nil
+		Country: p.Country, Birthday: p.Birthday, Handle: p.Handle, Status: StatusActive}, token, nil
 }
 
 // UpdateProfile sets the country and birthday of an existing account. Registration collects
@@ -284,9 +303,9 @@ func (s *Service) GetByID(ctx context.Context, id string) (*Account, error) {
 	// not selected here, and a console user object with country "" is not one
 	// a console will take.
 	err := s.pool.QueryRow(ctx, `SELECT id, email, display_name, status, email_verified_at, created_at,
-		COALESCE(country, ''), COALESCE(birthday::text, '')
+		COALESCE(country, ''), COALESCE(birthday::text, ''), COALESCE(handle,'')
 		FROM accounts WHERE id = $1 AND status <> 'deleted'`, id).
-		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday)
+		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday, &a.Handle)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -302,11 +321,11 @@ func (s *Service) GetByID(ctx context.Context, id string) (*Account, error) {
 func (s *Service) SessionAccount(ctx context.Context, token string) (*Account, error) {
 	var a Account
 	var verifiedAt *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT a.id, a.email, a.display_name, a.status, a.email_verified_at, a.created_at
+	err := s.pool.QueryRow(ctx, `SELECT a.id, a.email, a.display_name, a.status, a.email_verified_at, a.created_at, COALESCE(a.handle,'')
 		FROM sessions s JOIN accounts a ON a.id = s.account_id
 		WHERE s.token_hash = $1 AND s.expires_at > now() AND s.revoked_at IS NULL`,
 		hashToken(token, s.pepper)).
-		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt)
+		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Handle)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

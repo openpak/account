@@ -119,6 +119,7 @@ func (*SetDisplayNameResponse) Descriptor() ([]byte, []int) {
 
 type RegisterAccountRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
+	Handle          string                 `protobuf:"bytes,8,opt,name=handle,proto3" json:"handle,omitempty"`                                          // Required, immutable public identifier.
 	CallerNamespace string                 `protobuf:"bytes,1,opt,name=caller_namespace,json=callerNamespace,proto3" json:"caller_namespace,omitempty"` // adapter namespace
 	Purpose         string                 `protobuf:"bytes,2,opt,name=purpose,proto3" json:"purpose,omitempty"`                                        // e.g. "console_registration"
 	Email           string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
@@ -159,6 +160,13 @@ func (x *RegisterAccountRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RegisterAccountRequest.ProtoReflect.Descriptor instead.
 func (*RegisterAccountRequest) Descriptor() ([]byte, []int) {
 	return file_openpak_account_v1_registration_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RegisterAccountRequest) GetHandle() string {
+	if x != nil {
+		return x.Handle
+	}
+	return ""
 }
 
 func (x *RegisterAccountRequest) GetCallerNamespace() string {
@@ -283,8 +291,9 @@ const file_openpak_account_v1_registration_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12!\n" +
 	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\x18\n" +
-	"\x16SetDisplayNameResponse\"\xe8\x01\n" +
-	"\x16RegisterAccountRequest\x12)\n" +
+	"\x16SetDisplayNameResponse\"\x80\x02\n" +
+	"\x16RegisterAccountRequest\x12\x16\n" +
+	"\x06handle\x18\b \x01(\tR\x06handle\x12)\n" +
 	"\x10caller_namespace\x18\x01 \x01(\tR\x0fcallerNamespace\x12\x18\n" +
 	"\apurpose\x18\x02 \x01(\tR\apurpose\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x1a\n" +

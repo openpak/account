@@ -303,7 +303,7 @@ func TestWhoami(t *testing.T) {
 func TestMailLanguage(t *testing.T) {
 	_, h, box := webEnv(t)
 	req := httptest.NewRequest("POST", "/v1/register", strings.NewReader(
-		`{"email":"lang@example.com","password":"correct horse battery","display_name":"Ana"}`))
+		`{"email":"lang@example.com","password":"correct horse battery","display_name":"Ana","handle":"AnaTester"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Language", "de")
 	h.ServeHTTP(httptest.NewRecorder(), req)

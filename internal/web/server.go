@@ -110,6 +110,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Email       string `json:"email"`
 		Password    string `json:"password"`
 		DisplayName string `json:"display_name"`
+		Handle      string `json:"handle"`
 		// Required by the Switch's user object; collected at registration so no adapter has to
 		// invent them later.
 		Country  string `json:"country"`
@@ -118,7 +119,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	acct, verifyToken, err := s.identity.RegisterWithProfile(r.Context(), req.Email, req.Password, req.DisplayName,
+	acct, verifyToken, err := s.identity.RegisterWithHandle(r.Context(), req.Email, req.Password, req.DisplayName, req.Handle,
 		identity.Profile{Country: req.Country, Birthday: req.Birthday})
 	switch {
 	case err == nil:
@@ -132,6 +133,12 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		// No mailer configured (development): make the flow completable by
 		// surfacing the token; never the case in production wiring.
 		writeJSON(w, http.StatusCreated, map[string]any{"account_id": acct.ID, "verification_token": verifyToken})
+		return
+	case errors.Is(err, identity.ErrHandleTaken):
+		writeError(w, http.StatusConflict, "handle_taken")
+		return
+	case errors.Is(err, identity.ErrHandleInvalid), errors.Is(err, identity.ErrHandleReserved), errors.Is(err, identity.ErrHandleProfane):
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	case errors.Is(err, identity.ErrEmailTaken):
 		// Existing unverified account: resending on retry repairs the
@@ -448,6 +455,7 @@ func (s *Server) handleWhoami(w http.ResponseWriter, r *http.Request, acct *iden
 		"account_id":         acct.ID,
 		"email":              acct.Email,
 		"display_name":       acct.DisplayName,
+		"handle":             acct.Handle,
 		"status":             status,
 		"email_verified":     acct.EmailVerified,
 		"two_factor_enabled": twoFA,

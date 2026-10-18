@@ -38,7 +38,7 @@ func TestFollowupNoMailerNoPanic(t *testing.T) {
 		t.Fatalf("unexpected body: %s", rec.Body.String())
 	}
 	// Same for registration retry path (duplicate) with nil mailer.
-	rec = postJSON(t, srv, "/v1/register", `{"email":"panic@example.com","password":"correct horse battery","display_name":"P"}`)
+	rec = postJSON(t, srv, "/v1/register", `{"email":"panic@example.com","password":"correct horse battery","display_name":"P","handle":"PanicUser"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "verification email has been sent") {
 		t.Fatalf("duplicate register with nil mailer: %d %s", rec.Code, rec.Body.String())
 	}
@@ -59,7 +59,7 @@ func TestFollowupResendOnRetry(t *testing.T) {
 	})
 	srv, _, _ := newWebServer(t, ident, mail)
 
-	rec := postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"correct horse battery","display_name":"R"}`)
+	rec := postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"correct horse battery","display_name":"R","handle":"ResendUser1"}`)
 	if rec.Code != 200 {
 		t.Fatalf("register with failing mailer: %d %s", rec.Code, rec.Body.String())
 	}
@@ -73,7 +73,7 @@ func TestFollowupResendOnRetry(t *testing.T) {
 	// User retries registration (same email + same password): response
 	// identical, email now goes out (mailer recovered).
 	fail = false
-	rec = postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"correct horse battery","display_name":"R"}`)
+	rec = postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"correct horse battery","display_name":"R","handle":"ResendUser2"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "verification email has been sent") {
 		t.Fatalf("retry register: %d %s", rec.Code, rec.Body.String())
 	}
@@ -82,13 +82,13 @@ func TestFollowupResendOnRetry(t *testing.T) {
 	}
 
 	// Wrong password on retry triggers NO delivery (anti mail-oracle).
-	rec = postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"wrong password 999","display_name":"R"}`)
+	rec = postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"wrong password 999","display_name":"R","handle":"ResendUser3"}`)
 	if rec.Code != 200 || len(*sent) != 1 {
 		t.Fatalf("wrong-password retry must not send: %d %v", rec.Code, *sent)
 	}
 
 	// Rapid extra retries with correct creds are throttled (10 minutes).
-	rec = postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"correct horse battery","display_name":"R"}`)
+	rec = postJSON(t, srv, "/v1/register", `{"email":"resend@example.com","password":"correct horse battery","display_name":"R","handle":"ResendUser4"}`)
 	if rec.Code != 200 {
 		t.Fatalf("throttled retry: %d", rec.Code)
 	}

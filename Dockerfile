@@ -7,12 +7,16 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/app ./cmd/account
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/handle-migrate ./cmd/handle-migrate
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/handle-report ./cmd/handle-report
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata \
  && adduser -D -u 65532 -h /app app
 WORKDIR /app
 COPY --from=build /out/app /app/app
+COPY --from=build /out/handle-migrate /app/handle-migrate
+COPY --from=build /out/handle-report /app/handle-report
 
 RUN mkdir -p /app/data && chown -R 65532:65532 /app
 # Runs unprivileged: rootless podman maps this uid into the host's subuid range, and every

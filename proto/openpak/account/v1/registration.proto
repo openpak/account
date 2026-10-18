@@ -24,6 +24,7 @@ message SetDisplayNameRequest {
 message SetDisplayNameResponse {}
 
 message RegisterAccountRequest {
+  string handle = 8; // Required, immutable public identifier.
   string caller_namespace = 1; // adapter namespace
   string purpose = 2;          // e.g. "console_registration"
   string email = 3;

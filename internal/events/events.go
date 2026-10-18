@@ -21,6 +21,8 @@ import (
 // core's own writers and EmitEvent callers are held to it, so a mistake
 // surfaces as InvalidArgument here instead of as a failed commit.
 var KnownTypes = map[string]bool{
+	"account_created":        true,
+	"handle_assigned":        true,
 	"account_banned":         true,
 	"account_unbanned":       true,
 	"link_unlinked":          true,

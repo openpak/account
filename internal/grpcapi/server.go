@@ -267,6 +267,7 @@ func (s *Server) GetAccount(ctx context.Context, req *accountv1.GetAccountReques
 		Status:           protoStatus(a.Status),
 		EmailVerified:    a.EmailVerified,
 		DisplayName:      a.DisplayName,
+		Handle:           a.Handle,
 		Country:          a.Country,
 		Birthday:         a.Birthday,
 		Email:            a.Email,

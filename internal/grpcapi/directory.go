@@ -35,7 +35,7 @@ func (s *Server) ListAccounts(ctx context.Context, req *accountv1.ListAccountsRe
 		out.NextAfterAccountId = accounts[len(accounts)-1].ID
 	}
 	for _, a := range accounts {
-		out.Accounts = append(out.Accounts, &accountv1.AccountProjection{AccountId: a.ID, DisplayName: a.DisplayName, Country: a.Country})
+		out.Accounts = append(out.Accounts, &accountv1.AccountProjection{AccountId: a.ID, DisplayName: a.DisplayName, Country: a.Country, Handle: a.Handle})
 	}
 	return out, nil
 }

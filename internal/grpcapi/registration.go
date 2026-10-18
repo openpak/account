@@ -23,7 +23,7 @@ func (s *Server) RegisterAccount(ctx context.Context, req *accountv1.RegisterAcc
 	if req.GetCallerNamespace() == "" || req.GetPurpose() == "" {
 		return nil, status.Error(codes.InvalidArgument, "caller_namespace and purpose are required")
 	}
-	acct, token, err := s.identity.RegisterWithProfile(ctx, req.GetEmail(), req.GetPassword(), req.GetDisplayName(),
+	acct, token, err := s.identity.RegisterWithHandle(ctx, req.GetEmail(), req.GetPassword(), req.GetDisplayName(), req.GetHandle(),
 		identity.Profile{Country: req.GetCountry()})
 	if err != nil {
 		if err == identity.ErrEmailTaken {
@@ -37,6 +37,9 @@ func (s *Server) RegisterAccount(ctx context.Context, req *accountv1.RegisterAcc
 			// Do not confirm or deny registration to the console user; the
 			// adapter surfaces its protocol-appropriate generic error.
 			return &accountv1.RegisterAccountResponse{EmailTaken: true}, nil
+		}
+		if errors.Is(err, identity.ErrHandleTaken) || errors.Is(err, identity.ErrHandleInvalid) || errors.Is(err, identity.ErrHandleReserved) || errors.Is(err, identity.ErrHandleProfane) {
+			return nil, handleStatus(err)
 		}
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
