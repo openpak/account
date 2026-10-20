@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	Identity_UpdatePublicProfile_FullMethodName     = "/openpak.account.v1.Identity/UpdatePublicProfile"
 	Identity_FinalizeAccountDeletion_FullMethodName = "/openpak.account.v1.Identity/FinalizeAccountDeletion"
 	Identity_CheckHandle_FullMethodName             = "/openpak.account.v1.Identity/CheckHandle"
 	Identity_ResolveHandle_FullMethodName           = "/openpak.account.v1.Identity/ResolveHandle"
@@ -40,6 +41,8 @@ const (
 // Internal identity contract: narrowly scoped verification and status.
 // Never exposes password hashes or recovery credentials.
 type IdentityClient interface {
+	// Update only supplied public profile fields; omitted fields remain unchanged.
+	UpdatePublicProfile(ctx context.Context, in *UpdatePublicProfileRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
 	// Home-only operator action, after a deletion request. Not a user rename.
 	FinalizeAccountDeletion(ctx context.Context, in *RequestAccountDeletionRequest, opts ...grpc.CallOption) (*RequestAccountDeletionResponse, error)
 	CheckHandle(ctx context.Context, in *CheckHandleRequest, opts ...grpc.CallOption) (*CheckHandleResponse, error)
@@ -80,6 +83,16 @@ type identityClient struct {
 
 func NewIdentityClient(cc grpc.ClientConnInterface) IdentityClient {
 	return &identityClient{cc}
+}
+
+func (c *identityClient) UpdatePublicProfile(ctx context.Context, in *UpdatePublicProfileRequest, opts ...grpc.CallOption) (*GetAccountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAccountResponse)
+	err := c.cc.Invoke(ctx, Identity_UpdatePublicProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *identityClient) FinalizeAccountDeletion(ctx context.Context, in *RequestAccountDeletionRequest, opts ...grpc.CallOption) (*RequestAccountDeletionResponse, error) {
@@ -209,6 +222,8 @@ func (c *identityClient) VerifySecondFactor(ctx context.Context, in *VerifySecon
 // Internal identity contract: narrowly scoped verification and status.
 // Never exposes password hashes or recovery credentials.
 type IdentityServer interface {
+	// Update only supplied public profile fields; omitted fields remain unchanged.
+	UpdatePublicProfile(context.Context, *UpdatePublicProfileRequest) (*GetAccountResponse, error)
 	// Home-only operator action, after a deletion request. Not a user rename.
 	FinalizeAccountDeletion(context.Context, *RequestAccountDeletionRequest) (*RequestAccountDeletionResponse, error)
 	CheckHandle(context.Context, *CheckHandleRequest) (*CheckHandleResponse, error)
@@ -251,6 +266,9 @@ type IdentityServer interface {
 // pointer dereference when methods are called.
 type UnimplementedIdentityServer struct{}
 
+func (UnimplementedIdentityServer) UpdatePublicProfile(context.Context, *UpdatePublicProfileRequest) (*GetAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdatePublicProfile not implemented")
+}
 func (UnimplementedIdentityServer) FinalizeAccountDeletion(context.Context, *RequestAccountDeletionRequest) (*RequestAccountDeletionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FinalizeAccountDeletion not implemented")
 }
@@ -306,6 +324,24 @@ func RegisterIdentityServer(s grpc.ServiceRegistrar, srv IdentityServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Identity_ServiceDesc, srv)
+}
+
+func _Identity_UpdatePublicProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePublicProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServer).UpdatePublicProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Identity_UpdatePublicProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServer).UpdatePublicProfile(ctx, req.(*UpdatePublicProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Identity_FinalizeAccountDeletion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -531,6 +567,10 @@ var Identity_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "openpak.account.v1.Identity",
 	HandlerType: (*IdentityServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "UpdatePublicProfile",
+			Handler:    _Identity_UpdatePublicProfile_Handler,
+		},
 		{
 			MethodName: "FinalizeAccountDeletion",
 			Handler:    _Identity_FinalizeAccountDeletion_Handler,

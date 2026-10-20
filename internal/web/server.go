@@ -455,6 +455,8 @@ func (s *Server) handleWhoami(w http.ResponseWriter, r *http.Request, acct *iden
 		"account_id":         acct.ID,
 		"email":              acct.Email,
 		"display_name":       acct.DisplayName,
+		"bio":                acct.Bio,
+		"motto":              acct.Motto,
 		"handle":             acct.Handle,
 		"status":             status,
 		"email_verified":     acct.EmailVerified,
@@ -620,22 +622,24 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, ac
 // and nothing downstream invents a value for what is missing.
 func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request, acct *identity.Account) {
 	var req struct {
-		Country     string `json:"country"`
-		Birthday    string `json:"birthday"`
-		DisplayName string `json:"display_name"`
+		Country     string  `json:"country"`
+		Birthday    string  `json:"birthday"`
+		DisplayName string  `json:"display_name"`
+		Bio         *string `json:"bio"`
+		Motto       *string `json:"motto"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
 	updated, err := s.identity.UpdateProfile(r.Context(), acct.ID, identity.Profile{
-		Country: req.Country, Birthday: req.Birthday, DisplayName: req.DisplayName})
+		Country: req.Country, Birthday: req.Birthday, DisplayName: req.DisplayName, Bio: req.Bio, Motto: req.Motto})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"country": updated.Country, "birthday": updated.Birthday,
-		"display_name": updated.DisplayName,
+		"display_name": updated.DisplayName, "bio": updated.Bio, "motto": updated.Motto,
 	})
 }
 

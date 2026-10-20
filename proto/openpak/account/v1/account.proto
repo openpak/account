@@ -7,6 +7,8 @@ option go_package = "openpak/account/proto/openpak/account/v1;accountv1";
 // Internal identity contract: narrowly scoped verification and status.
 // Never exposes password hashes or recovery credentials.
 service Identity {
+  // Update only supplied public profile fields; omitted fields remain unchanged.
+  rpc UpdatePublicProfile(UpdatePublicProfileRequest) returns (GetAccountResponse);
   // Home-only operator action, after a deletion request. Not a user rename.
   rpc FinalizeAccountDeletion(RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse);
   rpc CheckHandle(CheckHandleRequest) returns (CheckHandleResponse);
@@ -98,6 +100,9 @@ message GetAccountRequest { string account_id = 1; }
 
 message GetAccountResponse {
   string handle = 9;
+  string bio = 10;
+  string motto = 11;
+  uint64 profile_version = 12;
   string account_id = 1;
   AccountStatus status = 2;
   bool email_verified = 3;
@@ -283,3 +288,11 @@ message ResolveHandleRequest { string handle = 1; }
 message ResolveHandleResponse { string account_id = 1; }
 message ClaimHandleRequest { string account_id = 1; string handle = 2; }
 message ClaimHandleResponse {}
+
+message UpdatePublicProfileRequest {
+  string account_id = 1;
+  optional string display_name = 2;
+  optional string country = 3;
+  optional string bio = 4;
+  optional string motto = 5;
+}

@@ -55,8 +55,11 @@ type Account struct {
 	CreatedAt     time.Time
 	// Collected at registration; the Switch adapter needs both to build a user object the
 	// console will accept.
-	Country  string
-	Birthday string
+	Country        string
+	Birthday       string
+	Bio            string
+	Motto          string
+	ProfileVersion uint64
 }
 
 // Emitter records durable invalidation events inside the caller's
@@ -129,6 +132,8 @@ type Profile struct {
 	// DisplayName is what other people see. Empty in an update means "leave it
 	// alone", because a blank name is never what someone meant.
 	DisplayName string
+	Bio         *string
+	Motto       *string
 }
 
 // ErrBadDisplayName is the 1-32 character rule SetDisplayName shares with registration.
@@ -141,7 +146,7 @@ func (s *Service) SetDisplayName(ctx context.Context, accountID, displayName str
 		return ErrBadDisplayName
 	}
 	tag, err := s.pool.Exec(ctx,
-		`UPDATE accounts SET display_name = $2, updated_at = now() WHERE id = $1 AND status = 'active'`,
+		`UPDATE accounts SET display_name = $2, profile_version = profile_version + 1, updated_at = now() WHERE id = $1 AND status = 'active'`,
 		accountID, dn)
 	if err != nil {
 		return fmt.Errorf("identity: set display name: %w", err)
@@ -222,9 +227,10 @@ func (s *Service) UpdateProfile(ctx context.Context, accountID string, p Profile
 	// field must not erase it.
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE accounts SET country = $2, birthday = $3,
-			display_name = COALESCE(NULLIF($4,''), display_name), updated_at = now()
+			display_name = COALESCE(NULLIF($4,''), display_name),
+			bio = COALESCE($5, bio), motto = COALESCE($6, motto), profile_version = profile_version + 1, updated_at = now()
 		WHERE id = $1`,
-		accountID, p.Country, birthday, p.DisplayName)
+		accountID, p.Country, birthday, p.DisplayName, p.Bio, p.Motto)
 	if err != nil {
 		return nil, fmt.Errorf("identity: update profile: %w", err)
 	}
@@ -303,9 +309,9 @@ func (s *Service) GetByID(ctx context.Context, id string) (*Account, error) {
 	// not selected here, and a console user object with country "" is not one
 	// a console will take.
 	err := s.pool.QueryRow(ctx, `SELECT id, email, display_name, status, email_verified_at, created_at,
-		COALESCE(country, ''), COALESCE(birthday::text, ''), COALESCE(handle,'')
+		COALESCE(country, ''), COALESCE(birthday::text, ''), COALESCE(handle,''), bio, motto, profile_version
 		FROM accounts WHERE id = $1 AND status <> 'deleted'`, id).
-		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday, &a.Handle)
+		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday, &a.Handle, &a.Bio, &a.Motto, &a.ProfileVersion)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -725,6 +731,9 @@ func (s *Service) reissueVerification(ctx context.Context, accountID string) str
 // validateProfile keeps obviously wrong values out of the database; both fields are optional
 // here so an adapter that never collected them can still register an account.
 func validateProfile(p *Profile) error {
+	if err := validateProfileText(p.Bio, p.Motto); err != nil {
+		return err
+	}
 	p.Country = strings.ToUpper(strings.TrimSpace(p.Country))
 	p.Birthday = strings.TrimSpace(p.Birthday)
 	if p.Country != "" && len(p.Country) != 2 {

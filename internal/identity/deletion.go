@@ -35,7 +35,7 @@ func (s *Service) FinalizeDeletion(ctx context.Context, accountID string) error 
 			}
 		}
 		if _, err := tx.Exec(ctx, `UPDATE accounts SET status='deleted', email=id::text||'@deleted.invalid',
-   email_normalized=id::text||'@deleted.invalid', password_hash='', display_name='', country='',birthday=NULL,
+   email_normalized=id::text||'@deleted.invalid', password_hash='', display_name='', country='',birthday=NULL, bio='',motto='',
    email_verified_at=NULL,updated_at=now() WHERE id=$1`, accountID); err != nil {
 			return err
 		}

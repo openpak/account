@@ -543,6 +543,9 @@ func (x *GetAccountRequest) GetAccountId() string {
 type GetAccountResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Handle           string                 `protobuf:"bytes,9,opt,name=handle,proto3" json:"handle,omitempty"`
+	Bio              string                 `protobuf:"bytes,10,opt,name=bio,proto3" json:"bio,omitempty"`
+	Motto            string                 `protobuf:"bytes,11,opt,name=motto,proto3" json:"motto,omitempty"`
+	ProfileVersion   uint64                 `protobuf:"varint,12,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
 	AccountId        string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	Status           AccountStatus          `protobuf:"varint,2,opt,name=status,proto3,enum=openpak.account.v1.AccountStatus" json:"status,omitempty"`
 	EmailVerified    bool                   `protobuf:"varint,3,opt,name=email_verified,json=emailVerified,proto3" json:"email_verified,omitempty"`
@@ -592,6 +595,27 @@ func (x *GetAccountResponse) GetHandle() string {
 		return x.Handle
 	}
 	return ""
+}
+
+func (x *GetAccountResponse) GetBio() string {
+	if x != nil {
+		return x.Bio
+	}
+	return ""
+}
+
+func (x *GetAccountResponse) GetMotto() string {
+	if x != nil {
+		return x.Motto
+	}
+	return ""
+}
+
+func (x *GetAccountResponse) GetProfileVersion() uint64 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
 }
 
 func (x *GetAccountResponse) GetAccountId() string {
@@ -2231,6 +2255,82 @@ func (*ClaimHandleResponse) Descriptor() ([]byte, []int) {
 	return file_openpak_account_v1_account_proto_rawDescGZIP(), []int{36}
 }
 
+type UpdatePublicProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	DisplayName   *string                `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3,oneof" json:"display_name,omitempty"`
+	Country       *string                `protobuf:"bytes,3,opt,name=country,proto3,oneof" json:"country,omitempty"`
+	Bio           *string                `protobuf:"bytes,4,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	Motto         *string                `protobuf:"bytes,5,opt,name=motto,proto3,oneof" json:"motto,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdatePublicProfileRequest) Reset() {
+	*x = UpdatePublicProfileRequest{}
+	mi := &file_openpak_account_v1_account_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdatePublicProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdatePublicProfileRequest) ProtoMessage() {}
+
+func (x *UpdatePublicProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_account_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdatePublicProfileRequest.ProtoReflect.Descriptor instead.
+func (*UpdatePublicProfileRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_account_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *UpdatePublicProfileRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UpdatePublicProfileRequest) GetDisplayName() string {
+	if x != nil && x.DisplayName != nil {
+		return *x.DisplayName
+	}
+	return ""
+}
+
+func (x *UpdatePublicProfileRequest) GetCountry() string {
+	if x != nil && x.Country != nil {
+		return *x.Country
+	}
+	return ""
+}
+
+func (x *UpdatePublicProfileRequest) GetBio() string {
+	if x != nil && x.Bio != nil {
+		return *x.Bio
+	}
+	return ""
+}
+
+func (x *UpdatePublicProfileRequest) GetMotto() string {
+	if x != nil && x.Motto != nil {
+		return *x.Motto
+	}
+	return ""
+}
+
 var File_openpak_account_v1_account_proto protoreflect.FileDescriptor
 
 const file_openpak_account_v1_account_proto_rawDesc = "" +
@@ -2267,9 +2367,13 @@ const file_openpak_account_v1_account_proto_rawDesc = "" +
 	"\x13two_factor_required\x18\x06 \x01(\bR\x11twoFactorRequired\"2\n" +
 	"\x11GetAccountRequest\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\tR\taccountId\"\xca\x02\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"\x9b\x03\n" +
 	"\x12GetAccountResponse\x12\x16\n" +
-	"\x06handle\x18\t \x01(\tR\x06handle\x12\x1d\n" +
+	"\x06handle\x18\t \x01(\tR\x06handle\x12\x10\n" +
+	"\x03bio\x18\n" +
+	" \x01(\tR\x03bio\x12\x14\n" +
+	"\x05motto\x18\v \x01(\tR\x05motto\x12'\n" +
+	"\x0fprofile_version\x18\f \x01(\x04R\x0eprofileVersion\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x129\n" +
 	"\x06status\x18\x02 \x01(\x0e2!.openpak.account.v1.AccountStatusR\x06status\x12%\n" +
@@ -2389,7 +2493,19 @@ const file_openpak_account_v1_account_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
 	"\x06handle\x18\x02 \x01(\tR\x06handle\"\x15\n" +
-	"\x13ClaimHandleResponse*\xa6\x01\n" +
+	"\x13ClaimHandleResponse\"\xe3\x01\n" +
+	"\x1aUpdatePublicProfileRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12&\n" +
+	"\fdisplay_name\x18\x02 \x01(\tH\x00R\vdisplayName\x88\x01\x01\x12\x1d\n" +
+	"\acountry\x18\x03 \x01(\tH\x01R\acountry\x88\x01\x01\x12\x15\n" +
+	"\x03bio\x18\x04 \x01(\tH\x02R\x03bio\x88\x01\x01\x12\x19\n" +
+	"\x05motto\x18\x05 \x01(\tH\x03R\x05motto\x88\x01\x01B\x0f\n" +
+	"\r_display_nameB\n" +
+	"\n" +
+	"\b_countryB\x06\n" +
+	"\x04_bioB\b\n" +
+	"\x06_motto*\xa6\x01\n" +
 	"\rAccountStatus\x12\x1e\n" +
 	"\x1aACCOUNT_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15ACCOUNT_STATUS_ACTIVE\x10\x01\x12\x19\n" +
@@ -2401,9 +2517,9 @@ const file_openpak_account_v1_account_proto_rawDesc = "" +
 	"\x12LINK_STATE_PENDING\x10\x01\x12\x15\n" +
 	"\x11LINK_STATE_ACTIVE\x10\x02\x12\x17\n" +
 	"\x13LINK_STATE_REVOKING\x10\x03\x12\x16\n" +
-	"\x12LINK_STATE_REVOKED\x10\x042\xc3\n" +
-	"\n" +
-	"\bIdentity\x12\x80\x01\n" +
+	"\x12LINK_STATE_REVOKED\x10\x042\xb2\v\n" +
+	"\bIdentity\x12m\n" +
+	"\x13UpdatePublicProfile\x12..openpak.account.v1.UpdatePublicProfileRequest\x1a&.openpak.account.v1.GetAccountResponse\x12\x80\x01\n" +
 	"\x17FinalizeAccountDeletion\x121.openpak.account.v1.RequestAccountDeletionRequest\x1a2.openpak.account.v1.RequestAccountDeletionResponse\x12^\n" +
 	"\vCheckHandle\x12&.openpak.account.v1.CheckHandleRequest\x1a'.openpak.account.v1.CheckHandleResponse\x12d\n" +
 	"\rResolveHandle\x12(.openpak.account.v1.ResolveHandleRequest\x1a).openpak.account.v1.ResolveHandleResponse\x12^\n" +
@@ -2441,7 +2557,7 @@ func file_openpak_account_v1_account_proto_rawDescGZIP() []byte {
 }
 
 var file_openpak_account_v1_account_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_openpak_account_v1_account_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_openpak_account_v1_account_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_openpak_account_v1_account_proto_goTypes = []any{
 	(AccountStatus)(0),                      // 0: openpak.account.v1.AccountStatus
 	(LinkState)(0),                          // 1: openpak.account.v1.LinkState
@@ -2482,6 +2598,7 @@ var file_openpak_account_v1_account_proto_goTypes = []any{
 	(*ResolveHandleResponse)(nil),           // 36: openpak.account.v1.ResolveHandleResponse
 	(*ClaimHandleRequest)(nil),              // 37: openpak.account.v1.ClaimHandleRequest
 	(*ClaimHandleResponse)(nil),             // 38: openpak.account.v1.ClaimHandleResponse
+	(*UpdatePublicProfileRequest)(nil),      // 39: openpak.account.v1.UpdatePublicProfileRequest
 }
 var file_openpak_account_v1_account_proto_depIdxs = []int32{
 	0,  // 0: openpak.account.v1.VerifyPasswordResponse.status:type_name -> openpak.account.v1.AccountStatus
@@ -2493,48 +2610,50 @@ var file_openpak_account_v1_account_proto_depIdxs = []int32{
 	1,  // 6: openpak.account.v1.UnlinkLinkResponse.state:type_name -> openpak.account.v1.LinkState
 	1,  // 7: openpak.account.v1.GetLinkBySubjectResponse.state:type_name -> openpak.account.v1.LinkState
 	31, // 8: openpak.account.v1.ListAccountsResponse.accounts:type_name -> openpak.account.v1.AccountProjection
-	11, // 9: openpak.account.v1.Identity.FinalizeAccountDeletion:input_type -> openpak.account.v1.RequestAccountDeletionRequest
-	33, // 10: openpak.account.v1.Identity.CheckHandle:input_type -> openpak.account.v1.CheckHandleRequest
-	35, // 11: openpak.account.v1.Identity.ResolveHandle:input_type -> openpak.account.v1.ResolveHandleRequest
-	37, // 12: openpak.account.v1.Identity.ClaimHandle:input_type -> openpak.account.v1.ClaimHandleRequest
-	30, // 13: openpak.account.v1.Identity.ListAccounts:input_type -> openpak.account.v1.ListAccountsRequest
-	5,  // 14: openpak.account.v1.Identity.VerifyPassword:input_type -> openpak.account.v1.VerifyPasswordRequest
-	4,  // 15: openpak.account.v1.Identity.VerifyPasswordByID:input_type -> openpak.account.v1.VerifyPasswordByIDRequest
-	9,  // 16: openpak.account.v1.Identity.SetAdapterCredential:input_type -> openpak.account.v1.SetAdapterCredentialRequest
-	11, // 17: openpak.account.v1.Identity.RequestAccountDeletion:input_type -> openpak.account.v1.RequestAccountDeletionRequest
-	13, // 18: openpak.account.v1.Identity.VerifyAdapterCredential:input_type -> openpak.account.v1.VerifyAdapterCredentialRequest
-	7,  // 19: openpak.account.v1.Identity.GetAccount:input_type -> openpak.account.v1.GetAccountRequest
-	2,  // 20: openpak.account.v1.Identity.VerifySecondFactor:input_type -> openpak.account.v1.VerifySecondFactorRequest
-	21, // 21: openpak.account.v1.Links.ReserveLink:input_type -> openpak.account.v1.ReserveLinkRequest
-	23, // 22: openpak.account.v1.Links.ActivateLink:input_type -> openpak.account.v1.ActivateLinkRequest
-	25, // 23: openpak.account.v1.Links.UnlinkLink:input_type -> openpak.account.v1.UnlinkLinkRequest
-	27, // 24: openpak.account.v1.Links.GetLinkBySubject:input_type -> openpak.account.v1.GetLinkBySubjectRequest
-	28, // 25: openpak.account.v1.Links.GetActiveLinkByAccount:input_type -> openpak.account.v1.GetActiveLinkByAccountRequest
-	15, // 26: openpak.account.v1.Links.SetLinkPublicCode:input_type -> openpak.account.v1.SetLinkPublicCodeRequest
-	17, // 27: openpak.account.v1.Links.ListAccountLinks:input_type -> openpak.account.v1.ListAccountLinksRequest
-	20, // 28: openpak.account.v1.Links.GetLinkByPublicCode:input_type -> openpak.account.v1.GetLinkByPublicCodeRequest
-	12, // 29: openpak.account.v1.Identity.FinalizeAccountDeletion:output_type -> openpak.account.v1.RequestAccountDeletionResponse
-	34, // 30: openpak.account.v1.Identity.CheckHandle:output_type -> openpak.account.v1.CheckHandleResponse
-	36, // 31: openpak.account.v1.Identity.ResolveHandle:output_type -> openpak.account.v1.ResolveHandleResponse
-	38, // 32: openpak.account.v1.Identity.ClaimHandle:output_type -> openpak.account.v1.ClaimHandleResponse
-	32, // 33: openpak.account.v1.Identity.ListAccounts:output_type -> openpak.account.v1.ListAccountsResponse
-	6,  // 34: openpak.account.v1.Identity.VerifyPassword:output_type -> openpak.account.v1.VerifyPasswordResponse
-	6,  // 35: openpak.account.v1.Identity.VerifyPasswordByID:output_type -> openpak.account.v1.VerifyPasswordResponse
-	10, // 36: openpak.account.v1.Identity.SetAdapterCredential:output_type -> openpak.account.v1.SetAdapterCredentialResponse
-	12, // 37: openpak.account.v1.Identity.RequestAccountDeletion:output_type -> openpak.account.v1.RequestAccountDeletionResponse
-	14, // 38: openpak.account.v1.Identity.VerifyAdapterCredential:output_type -> openpak.account.v1.VerifyAdapterCredentialResponse
-	8,  // 39: openpak.account.v1.Identity.GetAccount:output_type -> openpak.account.v1.GetAccountResponse
-	3,  // 40: openpak.account.v1.Identity.VerifySecondFactor:output_type -> openpak.account.v1.VerifySecondFactorResponse
-	22, // 41: openpak.account.v1.Links.ReserveLink:output_type -> openpak.account.v1.ReserveLinkResponse
-	24, // 42: openpak.account.v1.Links.ActivateLink:output_type -> openpak.account.v1.ActivateLinkResponse
-	26, // 43: openpak.account.v1.Links.UnlinkLink:output_type -> openpak.account.v1.UnlinkLinkResponse
-	29, // 44: openpak.account.v1.Links.GetLinkBySubject:output_type -> openpak.account.v1.GetLinkBySubjectResponse
-	29, // 45: openpak.account.v1.Links.GetActiveLinkByAccount:output_type -> openpak.account.v1.GetLinkBySubjectResponse
-	16, // 46: openpak.account.v1.Links.SetLinkPublicCode:output_type -> openpak.account.v1.SetLinkPublicCodeResponse
-	19, // 47: openpak.account.v1.Links.ListAccountLinks:output_type -> openpak.account.v1.ListAccountLinksResponse
-	29, // 48: openpak.account.v1.Links.GetLinkByPublicCode:output_type -> openpak.account.v1.GetLinkBySubjectResponse
-	29, // [29:49] is the sub-list for method output_type
-	9,  // [9:29] is the sub-list for method input_type
+	39, // 9: openpak.account.v1.Identity.UpdatePublicProfile:input_type -> openpak.account.v1.UpdatePublicProfileRequest
+	11, // 10: openpak.account.v1.Identity.FinalizeAccountDeletion:input_type -> openpak.account.v1.RequestAccountDeletionRequest
+	33, // 11: openpak.account.v1.Identity.CheckHandle:input_type -> openpak.account.v1.CheckHandleRequest
+	35, // 12: openpak.account.v1.Identity.ResolveHandle:input_type -> openpak.account.v1.ResolveHandleRequest
+	37, // 13: openpak.account.v1.Identity.ClaimHandle:input_type -> openpak.account.v1.ClaimHandleRequest
+	30, // 14: openpak.account.v1.Identity.ListAccounts:input_type -> openpak.account.v1.ListAccountsRequest
+	5,  // 15: openpak.account.v1.Identity.VerifyPassword:input_type -> openpak.account.v1.VerifyPasswordRequest
+	4,  // 16: openpak.account.v1.Identity.VerifyPasswordByID:input_type -> openpak.account.v1.VerifyPasswordByIDRequest
+	9,  // 17: openpak.account.v1.Identity.SetAdapterCredential:input_type -> openpak.account.v1.SetAdapterCredentialRequest
+	11, // 18: openpak.account.v1.Identity.RequestAccountDeletion:input_type -> openpak.account.v1.RequestAccountDeletionRequest
+	13, // 19: openpak.account.v1.Identity.VerifyAdapterCredential:input_type -> openpak.account.v1.VerifyAdapterCredentialRequest
+	7,  // 20: openpak.account.v1.Identity.GetAccount:input_type -> openpak.account.v1.GetAccountRequest
+	2,  // 21: openpak.account.v1.Identity.VerifySecondFactor:input_type -> openpak.account.v1.VerifySecondFactorRequest
+	21, // 22: openpak.account.v1.Links.ReserveLink:input_type -> openpak.account.v1.ReserveLinkRequest
+	23, // 23: openpak.account.v1.Links.ActivateLink:input_type -> openpak.account.v1.ActivateLinkRequest
+	25, // 24: openpak.account.v1.Links.UnlinkLink:input_type -> openpak.account.v1.UnlinkLinkRequest
+	27, // 25: openpak.account.v1.Links.GetLinkBySubject:input_type -> openpak.account.v1.GetLinkBySubjectRequest
+	28, // 26: openpak.account.v1.Links.GetActiveLinkByAccount:input_type -> openpak.account.v1.GetActiveLinkByAccountRequest
+	15, // 27: openpak.account.v1.Links.SetLinkPublicCode:input_type -> openpak.account.v1.SetLinkPublicCodeRequest
+	17, // 28: openpak.account.v1.Links.ListAccountLinks:input_type -> openpak.account.v1.ListAccountLinksRequest
+	20, // 29: openpak.account.v1.Links.GetLinkByPublicCode:input_type -> openpak.account.v1.GetLinkByPublicCodeRequest
+	8,  // 30: openpak.account.v1.Identity.UpdatePublicProfile:output_type -> openpak.account.v1.GetAccountResponse
+	12, // 31: openpak.account.v1.Identity.FinalizeAccountDeletion:output_type -> openpak.account.v1.RequestAccountDeletionResponse
+	34, // 32: openpak.account.v1.Identity.CheckHandle:output_type -> openpak.account.v1.CheckHandleResponse
+	36, // 33: openpak.account.v1.Identity.ResolveHandle:output_type -> openpak.account.v1.ResolveHandleResponse
+	38, // 34: openpak.account.v1.Identity.ClaimHandle:output_type -> openpak.account.v1.ClaimHandleResponse
+	32, // 35: openpak.account.v1.Identity.ListAccounts:output_type -> openpak.account.v1.ListAccountsResponse
+	6,  // 36: openpak.account.v1.Identity.VerifyPassword:output_type -> openpak.account.v1.VerifyPasswordResponse
+	6,  // 37: openpak.account.v1.Identity.VerifyPasswordByID:output_type -> openpak.account.v1.VerifyPasswordResponse
+	10, // 38: openpak.account.v1.Identity.SetAdapterCredential:output_type -> openpak.account.v1.SetAdapterCredentialResponse
+	12, // 39: openpak.account.v1.Identity.RequestAccountDeletion:output_type -> openpak.account.v1.RequestAccountDeletionResponse
+	14, // 40: openpak.account.v1.Identity.VerifyAdapterCredential:output_type -> openpak.account.v1.VerifyAdapterCredentialResponse
+	8,  // 41: openpak.account.v1.Identity.GetAccount:output_type -> openpak.account.v1.GetAccountResponse
+	3,  // 42: openpak.account.v1.Identity.VerifySecondFactor:output_type -> openpak.account.v1.VerifySecondFactorResponse
+	22, // 43: openpak.account.v1.Links.ReserveLink:output_type -> openpak.account.v1.ReserveLinkResponse
+	24, // 44: openpak.account.v1.Links.ActivateLink:output_type -> openpak.account.v1.ActivateLinkResponse
+	26, // 45: openpak.account.v1.Links.UnlinkLink:output_type -> openpak.account.v1.UnlinkLinkResponse
+	29, // 46: openpak.account.v1.Links.GetLinkBySubject:output_type -> openpak.account.v1.GetLinkBySubjectResponse
+	29, // 47: openpak.account.v1.Links.GetActiveLinkByAccount:output_type -> openpak.account.v1.GetLinkBySubjectResponse
+	16, // 48: openpak.account.v1.Links.SetLinkPublicCode:output_type -> openpak.account.v1.SetLinkPublicCodeResponse
+	19, // 49: openpak.account.v1.Links.ListAccountLinks:output_type -> openpak.account.v1.ListAccountLinksResponse
+	29, // 50: openpak.account.v1.Links.GetLinkByPublicCode:output_type -> openpak.account.v1.GetLinkBySubjectResponse
+	30, // [30:51] is the sub-list for method output_type
+	9,  // [9:30] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -2545,13 +2664,14 @@ func file_openpak_account_v1_account_proto_init() {
 	if File_openpak_account_v1_account_proto != nil {
 		return
 	}
+	file_openpak_account_v1_account_proto_msgTypes[37].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_openpak_account_v1_account_proto_rawDesc), len(file_openpak_account_v1_account_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   37,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
