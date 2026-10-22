@@ -36,14 +36,14 @@ func TestPublicProfileSharedBetweenWebAndAdapters(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := web.New(ident, nil, "https://core.test", "https://site.test")
-	// A legacy client that never sends the new fields must preserve them.
+	// A older client that never sends the new fields must preserve them.
 	rec, _ := call(t, h, http.MethodPost, "/v1/profile", session, `{"country":"IE","birthday":"1990-01-01","display_name":"New Name"}`)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("legacy update: %d %s", rec.Code, rec.Body.String())
+		t.Fatalf("older update: %d %s", rec.Code, rec.Body.String())
 	}
 	got, err = client.GetAccount(ctx, &accountv1.GetAccountRequest{AccountId: a.ID})
 	if err != nil || got.GetBio() != bio || got.GetMotto() != motto || got.GetDisplayName() != "New Name" {
-		t.Fatalf("legacy client erased profile text: %v %v", got, err)
+		t.Fatalf("older client erased profile text: %v %v", got, err)
 	}
 	rec, _ = call(t, h, http.MethodPost, "/v1/profile", session, `{"country":"IE","birthday":"1990-01-01","bio":"Changed on website","motto":""}`)
 	if rec.Code != http.StatusOK {
