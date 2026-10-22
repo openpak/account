@@ -17,12 +17,12 @@ examples in tests. Availability is public; callers must rate-limit checks.
 
 `Identity.CheckHandle` is advisory. Registration and home-only `ClaimHandle`
 claim names atomically. `ClaimHandle` exists only for one assignment to a
-legacy account, with identical retries accepted. Account creation emits
-`account_created`; a legacy assignment emits `handle_assigned`, inside the
+pre-handle account, with identical retries accepted. Account creation emits
+`account_created`; an assignment emits `handle_assigned`, inside the
 same transaction. A handle never changes, so there is no handle_changed event.
 `GetAccount`, `ListAccounts` and HTTP `whoami` all return it.
 
-The database owns claims, format and immutability constraints. Legacy link
+The database owns claims, format and immutability constraints. Existing link
 public codes also reserve names during transition. Name-bearing links cannot
 publish another account's claimed handle, or diverge from their own handle.
 PlayStation link subjects must equal the chosen handle too. Numeric console
@@ -38,9 +38,9 @@ the hold. PSN link subjects are retired, preserving old link IDs for history;
 adapters must retire local name reservations on account_deleted too.
 
 The gRPC API is internal-key authenticated. Claim and finalization are home-only.
-No public endpoint can claim a legacy account or finalize deletion. HTTP and
+No public endpoint can claim a pre-handle account or finalize deletion. HTTP and
 console registration both require a handle; there is no pending-account bypass.
-The older Go registration helpers are for legacy fixtures only. New transports
+The older Go registration helpers are for older fixtures only. New transports
 must call RegisterWithHandle.
 
 ## Network contract

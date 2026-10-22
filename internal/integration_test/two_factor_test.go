@@ -160,11 +160,11 @@ func TestTwoFactor(t *testing.T) {
 	// gRPC: a password alone never passes for this account.
 	if _, err := idc.VerifyPassword(gctx, &accountv1.VerifyPasswordRequest{CallerNamespace: "switch", Purpose: "console_login",
 		Email: "2fa@example.com", Password: "correct horse battery"}); status.Code(err) != codes.FailedPrecondition {
-		t.Fatalf("legacy caller must fail closed: %v", err)
+		t.Fatalf("caller without second-factor support must fail closed: %v", err)
 	}
 	if _, err := idc.VerifyPasswordByID(gctx, &accountv1.VerifyPasswordByIDRequest{CallerNamespace: "wiiu", Purpose: "console_login",
 		AccountId: id, Password: "correct horse battery"}); status.Code(err) != codes.FailedPrecondition {
-		t.Fatalf("legacy caller by id must fail closed: %v", err)
+		t.Fatalf("caller without second-factor support by id must fail closed: %v", err)
 	}
 	if _, err := idc.VerifyPassword(gctx, &accountv1.VerifyPasswordRequest{CallerNamespace: "website", Purpose: "x",
 		Email: "2fa@example.com", Password: "wrong password 1", SecondFactorSupported: false}); status.Code(err) != codes.Unauthenticated {
@@ -210,7 +210,7 @@ func TestTwoFactor(t *testing.T) {
 	}
 	if vp, err := idc.VerifyPassword(gctx, &accountv1.VerifyPasswordRequest{CallerNamespace: "switch", Purpose: "console_login",
 		Email: "2fa@example.com", Password: "correct horse battery"}); err != nil || vp.GetTwoFactorRequired() {
-		t.Fatalf("legacy caller after disable: %+v %v", vp, err)
+		t.Fatalf("caller without second-factor support after disable: %+v %v", vp, err)
 	}
 }
 

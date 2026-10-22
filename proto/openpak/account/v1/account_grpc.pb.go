@@ -47,7 +47,7 @@ type IdentityClient interface {
 	FinalizeAccountDeletion(ctx context.Context, in *RequestAccountDeletionRequest, opts ...grpc.CallOption) (*RequestAccountDeletionResponse, error)
 	CheckHandle(ctx context.Context, in *CheckHandleRequest, opts ...grpc.CallOption) (*CheckHandleResponse, error)
 	ResolveHandle(ctx context.Context, in *ResolveHandleRequest, opts ...grpc.CallOption) (*ResolveHandleResponse, error)
-	// Home-only legacy migration: one assignment, no rename path.
+	// Home-only migration: one assignment, no rename path.
 	ClaimHandle(ctx context.Context, in *ClaimHandleRequest, opts ...grpc.CallOption) (*ClaimHandleResponse, error)
 	// Home-only, minimal active-account directory for adapter identity backfills.
 	// Keyset cursor is an account ID, not an offset; no emails or credentials.
@@ -228,7 +228,7 @@ type IdentityServer interface {
 	FinalizeAccountDeletion(context.Context, *RequestAccountDeletionRequest) (*RequestAccountDeletionResponse, error)
 	CheckHandle(context.Context, *CheckHandleRequest) (*CheckHandleResponse, error)
 	ResolveHandle(context.Context, *ResolveHandleRequest) (*ResolveHandleResponse, error)
-	// Home-only legacy migration: one assignment, no rename path.
+	// Home-only migration: one assignment, no rename path.
 	ClaimHandle(context.Context, *ClaimHandleRequest) (*ClaimHandleResponse, error)
 	// Home-only, minimal active-account directory for adapter identity backfills.
 	// Keyset cursor is an account ID, not an offset; no emails or credentials.

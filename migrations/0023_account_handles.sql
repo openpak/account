@@ -1,4 +1,4 @@
--- Nullable only for the explicitly reviewed openpak-account migration.
+-- Nullable only for the explicitly reviewed pre-handle account migration.
 ALTER TABLE accounts ADD COLUMN handle TEXT;
 ALTER TABLE accounts ADD COLUMN handle_assigned_at TIMESTAMPTZ;
 ALTER TABLE accounts ADD COLUMN deleted_at TIMESTAMPTZ;

@@ -158,8 +158,8 @@ func run() error {
 			if other.ID == a.ID {
 				continue
 			}
-			for _, legacy := range other.Links {
-				if legacy.Namespace != "wiiu" && legacy.Namespace != "xbox" && legacy.Namespace != "x360" && legacy.Namespace != "np" {
+			for _, link := range other.Links {
+				if link.Namespace != "wiiu" && link.Namespace != "xbox" && link.Namespace != "x360" && link.Namespace != "np" {
 					continue
 				}
 				normalized := strings.Map(func(r rune) rune {
@@ -167,7 +167,7 @@ func run() error {
 						return r
 					}
 					return -1
-				}, strings.ToLower(legacy.Name))
+				}, strings.ToLower(link.Name))
 				if normalized == key {
 					r.Issues = append(r.Issues, "chosen handle conflicts with another account's current network name")
 				}

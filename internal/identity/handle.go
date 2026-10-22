@@ -73,7 +73,7 @@ func (s *Service) CheckHandle(ctx context.Context, handle string) (HandleCheck, 
 	return result, nil
 }
 
-// ClaimHandle sets an existing legacy account's handle once. Identical retries
+// ClaimHandle sets an existing pre-handle account's handle once. Identical retries
 // succeed; even capitalization cannot change after the first claim.
 func (s *Service) ClaimHandle(ctx context.Context, accountID, handle string) error {
 	if err := ValidateHandle(handle); err != nil {
@@ -133,7 +133,7 @@ func mapHandleError(err error) error {
 	return err
 }
 
-// RegisterWithHandle is the public registration path. Legacy registration
+// RegisterWithHandle is the public registration path. Older registration
 // helpers remain for migration fixtures; no transport may create a new account
 // without a handle.
 func (s *Service) RegisterWithHandle(ctx context.Context, email, password, displayName, handle string, p Profile) (*Account, string, error) {

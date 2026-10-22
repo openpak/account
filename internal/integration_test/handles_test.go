@@ -41,11 +41,11 @@ func TestHandleOwnership(t *testing.T) {
 	if id, err := ident.ResolveHandle(ctx, "auroraone"); err != nil || id != a.ID {
 		t.Fatal(id, err)
 	}
-	b, _, err := ident.Register(ctx, "legacy@example.com", "correct horse battery", "Legacy")
+	b, _, err := ident.Register(ctx, "player@example.com", "correct horse battery", "Player")
 	if err != nil {
 		t.Fatal(err)
 	}
-	l, err := lnks.Reserve(ctx, b.ID, "xbox", "legacy-subject", "legacy")
+	l, err := lnks.Reserve(ctx, b.ID, "xbox", "adapter-subject", "player")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestHandleOwnership(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := lnks.SetPublicCode(ctx, l.ID, "AuroraOne", "auroraone"); err == nil {
-		t.Fatal("legacy adapter stole claimed handle")
+		t.Fatal("link adapter stole claimed handle")
 	}
 	if _, _, err := ident.RegisterWithHandle(ctx, "other@example.com", "correct horse battery", "", "auroraone", identity.Profile{}); !errors.Is(err, identity.ErrHandleTaken) {
 		t.Fatalf("duplicate: %v", err)
