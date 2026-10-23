@@ -21,7 +21,7 @@ func TestLoadFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("valid config rejected: %v", err)
 	}
-	if cfg.GRPCListenAddr != ":7000" || cfg.HTTPListenAddr != ":8000" {
+	if cfg.GRPCListenAddr != ":7000" || cfg.HTTPListenAddr != ":8000" || cfg.DeletionGrace != "720h" {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 }

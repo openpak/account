@@ -13,6 +13,15 @@ of truth; this file is the readable summary.
 
 ## Unreleased
 
+- **Automatic account erasure** (migration 0027). Deleting closes the account at once and sets
+  `erase_after` one grace period away (`ACCOUNT_DELETION_GRACE`, default 720h); the status it had
+  is kept. Signing in with the right password answers 409 `deletion_pending` with the date, and
+  `POST /v1/login/restore` reopens it and signs in; `RestoreAccountDeletion` is the admin restore
+  (home only, refused once the date has passed); a restore emits `account_restored`.
+  `ListDueAccountDeletions` feeds the website's finaliser, which erases every service and then
+  calls `FinalizeAccountDeletion`. Finalize now also deletes console links, friendships, blocks
+  and invitations (both directions), and adapter and play sessions. `GetAccount` reports
+  `erase_after_unix`. Closed accounts drop out of friend, request and block lists.
 - **Federation admission rules** (migration 0025). A node is one region, operator and approval on
   one or more servers. The node key only enrols servers (`JoinServer`); each server gets its own
   `opsrv_` key, announces on its own with a hardware report (cores, RAM, disk, SSD, IPv4/IPv6,

@@ -28,6 +28,7 @@ var KnownTypes = map[string]bool{
 	"link_unlinked":          true,
 	"account_delete_started": true,
 	"account_deleted":        true,
+	"account_restored":       true,
 	"credential_revoked":     true,
 	"friend_requested":       true,
 	"friend_accepted":        true,

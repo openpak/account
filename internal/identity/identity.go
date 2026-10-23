@@ -74,10 +74,14 @@ type Service struct {
 	sessionTTL time.Duration
 	emitter    Emitter
 	sealer     *sealer // TOTP secrets at rest; see SetTOTPKey
+	// deletionGrace is how long a closed account stays restorable before the
+	// finaliser erases it; see SetDeletionGrace.
+	deletionGrace time.Duration
 }
 
 func New(pool *pgxpool.Pool, pepper string, sessionTTL time.Duration, emitter Emitter) *Service {
-	return &Service{pool: pool, pepper: pepper, sessionTTL: sessionTTL, emitter: emitter, sealer: newSealer(pepper)}
+	return &Service{pool: pool, pepper: pepper, sessionTTL: sessionTTL, emitter: emitter, sealer: newSealer(pepper),
+		deletionGrace: DefaultDeletionGrace}
 }
 
 func normalizeEmail(email string) string {
@@ -273,9 +277,10 @@ func (s *Service) VerifyCredentials(ctx context.Context, email, password string)
 	var status Status
 	var verifiedAt *time.Time
 	var birthday *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at, country, birthday
+	var eraseAfter *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at, country, birthday, erase_after
 		FROM accounts WHERE email_normalized = $1`, normalized).
-		Scan(&id, &hash, &status, &verifiedAt, &country, &birthday)
+		Scan(&id, &hash, &status, &verifiedAt, &country, &birthday, &eraseAfter)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Equalize timing by performing a dummy bcrypt comparison.
 		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, password)))
@@ -283,6 +288,18 @@ func (s *Service) VerifyCredentials(ctx context.Context, email, password string)
 	}
 	if err != nil {
 		return nil, err
+	}
+	if status == StatusDeletionPending {
+		// A closed account is restorable, and only its owner may learn that:
+		// the password is checked before the answer differs from a wrong one.
+		if !comparePassword(hash, s.pepper, password) {
+			return nil, ErrBadCredentials
+		}
+		pe := &PendingDeletionError{AccountID: id}
+		if eraseAfter != nil {
+			pe.EraseAfter = *eraseAfter
+		}
+		return nil, pe
 	}
 	if err := mapStatusErr(status); err != nil {
 		return nil, err
@@ -628,12 +645,14 @@ func (s *Service) SetBannedBy(ctx context.Context, accountID string, banned bool
 	})
 }
 
-// RequestDeletion marks an account deletion-pending (FR-8 first stage):
-// immediate access disable, session revocation, durable event.
+// RequestDeletion closes an account (FR-8 first stage): immediate access
+// disable, session revocation, durable event, and an erasure date one grace
+// period away. The status it had is kept so a restore puts it back.
 func (s *Service) RequestDeletion(ctx context.Context, accountID string) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `UPDATE accounts SET status='deletion_pending', updated_at=now()
-			WHERE id=$1 AND status IN ('active','banned')`, accountID)
+		tag, err := tx.Exec(ctx, `UPDATE accounts SET status='deletion_pending', status_before_deletion=status,
+			closed_at=now(), erase_after=now() + make_interval(secs => $2), updated_at=now()
+			WHERE id=$1 AND status IN ('active','banned')`, accountID, s.deletionGrace.Seconds())
 		if err != nil {
 			return err
 		}

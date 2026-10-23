@@ -21,6 +21,9 @@ type Config struct {
 	// SHA-256 of it). Optional; unset derives the key from SessionSecret.
 	// Changing it makes every enrolled second factor unreadable.
 	TOTPKey string
+	// DeletionGrace is how long a closed account stays restorable before it
+	// is erased everywhere (Go duration; default 720h, 30 days).
+	DeletionGrace string
 }
 
 func Load() (*Config, error) {
@@ -32,6 +35,7 @@ func Load() (*Config, error) {
 		SessionTTL:     envOr("ACCOUNT_SESSION_TTL", "720h"),
 		Environment:    envOr("ACCOUNT_ENVIRONMENT", "production"),
 		TOTPKey:        os.Getenv("ACCOUNT_TOTP_KEY"),
+		DeletionGrace:  envOr("ACCOUNT_DELETION_GRACE", "720h"),
 	}
 	if origins := os.Getenv("ACCOUNT_ALLOWED_ORIGINS"); origins != "" {
 		c.AllowedOrigins = strings.Split(origins, ",")

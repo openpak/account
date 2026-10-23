@@ -28,14 +28,17 @@ publish another account's claimed handle, or diverge from their own handle.
 PlayStation link subjects must equal the chosen handle too. Numeric console
 identifiers and friend codes stay independent.
 
-Deletion requests disable access but retain the handle. Home operators explicitly
-invoke `FinalizeAccountDeletion` only after the deletion request; it destroys
-core credentials and emits `account_deleted`. The database starts a 90-day hold
+Deletion requests close the account at once but retain the handle while it
+stays restorable (`ACCOUNT_DELETION_GRACE`, default 30 days; signing in or an
+admin restores it). Once the grace period is over the website's erasure
+finaliser erases the account in every service and then calls
+`FinalizeAccountDeletion`; it destroys core credentials, the social graph and
+console links, and emits `account_deleted`. The database starts a 90-day hold
 at permanent deletion. During the hold neither lookup nor signup identifies the
 old owner. After it expires a new account may claim the handle, with a new
 account UUID and new console identities. Repeating finalization does not extend
-the hold. PSN link subjects are retired, preserving old link IDs for history;
-adapters must retire local name reservations on account_deleted too.
+the hold. Console links are deleted, so the same console can be linked to a new
+account; adapters must retire local name reservations on account_deleted too.
 
 The gRPC API is internal-key authenticated. Claim and finalization are home-only.
 No public endpoint can claim a pre-handle account or finalize deletion. HTTP and

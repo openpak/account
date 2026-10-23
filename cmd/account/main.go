@@ -77,6 +77,11 @@ func run() error {
 	if cfg.TOTPKey != "" {
 		ident.SetTOTPKey(cfg.TOTPKey)
 	}
+	grace, err := time.ParseDuration(cfg.DeletionGrace)
+	if err != nil || grace <= 0 {
+		return errors.New("invalid ACCOUNT_DELETION_GRACE: want a positive duration such as 720h")
+	}
+	ident.SetDeletionGrace(grace)
 	lnks := links.New(pool, evSvc)
 	socSvc := social.New(pool, evSvc)
 	sessSvc := sessions.New(pool)

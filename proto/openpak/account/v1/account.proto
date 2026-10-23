@@ -11,6 +11,13 @@ service Identity {
   rpc UpdatePublicProfile(UpdatePublicProfileRequest) returns (GetAccountResponse);
   // Home-only operator action, after a deletion request. Not a user rename.
   rpc FinalizeAccountDeletion(RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse);
+  // Home-only: closed accounts whose grace period is over, oldest first. The
+  // erasure finaliser erases each everywhere, then finalizes it.
+  rpc ListDueAccountDeletions(ListDueAccountDeletionsRequest) returns (ListDueAccountDeletionsResponse);
+  // Home-only admin restore: reopens a closed account within its grace period
+  // with the status it had. NotFound, FailedPrecondition (not closed) or
+  // OutOfRange (grace over, erasure started).
+  rpc RestoreAccountDeletion(RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse);
   rpc CheckHandle(CheckHandleRequest) returns (CheckHandleResponse);
   rpc ResolveHandle(ResolveHandleRequest) returns (ResolveHandleResponse);
   // Home-only migration: one assignment, no rename path.
@@ -28,8 +35,8 @@ service Identity {
   // Store an adapter-domain credential (e.g. a console's transformed
   // password hash). Separate domain from web passwords (FR-1/FR-3).
   rpc SetAdapterCredential(SetAdapterCredentialRequest) returns (SetAdapterCredentialResponse);
-  // Start account deletion (FR-8): disables access immediately, emits
-  // account_delete_started; full cleanup orchestration lands in M3/M4.
+  // Start account deletion (FR-8): closes the account immediately, emits
+  // account_delete_started, and sets the erasure date one grace period away.
   rpc RequestAccountDeletion(RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse);
   // Verify an adapter-domain credential. Never yields a web session.
   rpc VerifyAdapterCredential(VerifyAdapterCredentialRequest) returns (VerifyAdapterCredentialResponse);
@@ -113,6 +120,9 @@ message GetAccountResponse {
   // The sign-in address, for an adapter whose console protocol carries it (a Nintendo Account's
   // users/me has the address and a masked form of it). Never logged by an adapter.
   string email = 8;
+  // Set while the account is closed (DELETION_PENDING): when it will be erased
+  // unless restored.
+  int64 erase_after_unix = 13;
 }
 
 message SetAdapterCredentialRequest {
@@ -131,6 +141,14 @@ message RequestAccountDeletionRequest {
 }
 
 message RequestAccountDeletionResponse {}
+
+message ListDueAccountDeletionsRequest {
+  int32 limit = 1; // default and cap 100
+}
+
+message ListDueAccountDeletionsResponse {
+  repeated string account_ids = 1;
+}
 
 message VerifyAdapterCredentialRequest {
   string caller_namespace = 1;

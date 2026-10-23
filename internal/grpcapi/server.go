@@ -293,11 +293,22 @@ func (s *Server) GetAccount(ctx context.Context, req *accountv1.GetAccountReques
 		EmailVerified:    a.EmailVerified,
 		DisplayName:      a.DisplayName,
 		Bio:              a.Bio, Motto: a.Motto, ProfileVersion: a.ProfileVersion,
-		Handle:   a.Handle,
-		Country:  a.Country,
-		Birthday: a.Birthday,
-		Email:    a.Email,
+		Handle:         a.Handle,
+		Country:        a.Country,
+		Birthday:       a.Birthday,
+		Email:          a.Email,
+		EraseAfterUnix: eraseAfterUnix(ctx, s.identity, a),
 	}, nil
+}
+
+func eraseAfterUnix(ctx context.Context, id *identity.Service, a *identity.Account) int64 {
+	if a.Status != identity.StatusDeletionPending {
+		return 0
+	}
+	if t, err := id.EraseAfter(ctx, a.ID); err == nil && !t.IsZero() {
+		return t.Unix()
+	}
+	return 0
 }
 
 func protoStatus(s identity.Status) accountv1.AccountStatus {

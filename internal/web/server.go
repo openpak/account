@@ -43,6 +43,7 @@ func New(ident *identity.Service, m *mailer.Mailer, baseURL, siteBaseURL string)
 	s.mux.HandleFunc("GET /v1/email/confirm", s.handleEmailConfirmPage)
 	s.mux.HandleFunc("POST /v1/login", s.handleLogin)
 	s.mux.HandleFunc("POST /v1/login/2fa", s.handleLogin2FA)
+	s.mux.HandleFunc("POST /v1/login/restore", s.handleLoginRestore)
 	s.mux.HandleFunc("POST /v1/2fa/setup", s.auth(s.handle2FASetup))
 	s.mux.HandleFunc("POST /v1/2fa/enable", s.auth(s.handle2FAEnable))
 	s.mux.HandleFunc("POST /v1/2fa/disable", s.auth(s.handle2FADisable))
@@ -306,7 +307,43 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	token, challenge, acct, err := s.identity.BeginLogin(r.Context(), req.Email, req.Password)
+	s.finishLogin(w, r, req.Email, req.Password)
+}
+
+// handleLoginRestore reopens a closed account within its grace period, then
+// signs in exactly like /v1/login: {email, password}. The password is the
+// proof, as for a sign-in; an account that is not closed just signs in.
+func (s *Server) handleLoginRestore(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	switch err := s.identity.RestoreByPassword(r.Context(), req.Email, req.Password); {
+	case err == nil:
+	case errors.Is(err, identity.ErrGraceOver):
+		writeError(w, http.StatusGone, "the grace period is over; this account is being erased")
+		return
+	default:
+		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+	s.finishLogin(w, r, req.Email, req.Password)
+}
+
+// finishLogin is the shared tail of /v1/login and /v1/login/restore. A closed,
+// still restorable account answers 409 with its erasure date, and only to a
+// caller who gave the right password.
+func (s *Server) finishLogin(w http.ResponseWriter, r *http.Request, email, password string) {
+	token, challenge, acct, err := s.identity.BeginLogin(r.Context(), email, password)
+	var pending *identity.PendingDeletionError
+	if errors.As(err, &pending) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "account closed", "deletion_pending": true,
+			"erase_after": pending.EraseAfter.UTC().Format(time.RFC3339)})
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
