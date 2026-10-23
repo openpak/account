@@ -899,6 +899,7 @@ type Node struct {
 	TotalCores      int32     `protobuf:"varint,14,opt,name=total_cores,json=totalCores,proto3" json:"total_cores,omitempty"`
 	TotalRamMb      int64     `protobuf:"varint,15,opt,name=total_ram_mb,json=totalRamMb,proto3" json:"total_ram_mb,omitempty"`
 	TotalDiskGb     int64     `protobuf:"varint,16,opt,name=total_disk_gb,json=totalDiskGb,proto3" json:"total_disk_gb,omitempty"`
+	Test            bool      `protobuf:"varint,17,opt,name=test,proto3" json:"test,omitempty"` // admin view only; test nodes are never in ListNodes
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1043,6 +1044,13 @@ func (x *Node) GetTotalDiskGb() int64 {
 		return x.TotalDiskGb
 	}
 	return 0
+}
+
+func (x *Node) GetTest() bool {
+	if x != nil {
+		return x.Test
+	}
+	return false
 }
 
 type Server struct {
@@ -1833,6 +1841,602 @@ func (*DeleteLocationResponse) Descriptor() ([]byte, []int) {
 	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{29}
 }
 
+type SetNodeTestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Test          bool                   `protobuf:"varint,2,opt,name=test,proto3" json:"test,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNodeTestRequest) Reset() {
+	*x = SetNodeTestRequest{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNodeTestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNodeTestRequest) ProtoMessage() {}
+
+func (x *SetNodeTestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNodeTestRequest.ProtoReflect.Descriptor instead.
+func (*SetNodeTestRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *SetNodeTestRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *SetNodeTestRequest) GetTest() bool {
+	if x != nil {
+		return x.Test
+	}
+	return false
+}
+
+type SetNodeTestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNodeTestResponse) Reset() {
+	*x = SetNodeTestResponse{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNodeTestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNodeTestResponse) ProtoMessage() {}
+
+func (x *SetNodeTestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNodeTestResponse.ProtoReflect.Descriptor instead.
+func (*SetNodeTestResponse) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{31}
+}
+
+type ListTestersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTestersRequest) Reset() {
+	*x = ListTestersRequest{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTestersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTestersRequest) ProtoMessage() {}
+
+func (x *ListTestersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTestersRequest.ProtoReflect.Descriptor instead.
+func (*ListTestersRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{32}
+}
+
+type Tester struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	AddedUnix     int64                  `protobuf:"varint,4,opt,name=added_unix,json=addedUnix,proto3" json:"added_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Tester) Reset() {
+	*x = Tester{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Tester) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Tester) ProtoMessage() {}
+
+func (x *Tester) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Tester.ProtoReflect.Descriptor instead.
+func (*Tester) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *Tester) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *Tester) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *Tester) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+func (x *Tester) GetAddedUnix() int64 {
+	if x != nil {
+		return x.AddedUnix
+	}
+	return 0
+}
+
+type ListTestersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Testers       []*Tester              `protobuf:"bytes,1,rep,name=testers,proto3" json:"testers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTestersResponse) Reset() {
+	*x = ListTestersResponse{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTestersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTestersResponse) ProtoMessage() {}
+
+func (x *ListTestersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTestersResponse.ProtoReflect.Descriptor instead.
+func (*ListTestersResponse) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ListTestersResponse) GetTesters() []*Tester {
+	if x != nil {
+		return x.Testers
+	}
+	return nil
+}
+
+type PutTesterRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       string                 `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"` // account id or sign-in email
+	Note          string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutTesterRequest) Reset() {
+	*x = PutTesterRequest{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutTesterRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutTesterRequest) ProtoMessage() {}
+
+func (x *PutTesterRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutTesterRequest.ProtoReflect.Descriptor instead.
+func (*PutTesterRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *PutTesterRequest) GetAccount() string {
+	if x != nil {
+		return x.Account
+	}
+	return ""
+}
+
+func (x *PutTesterRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type PutTesterResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutTesterResponse) Reset() {
+	*x = PutTesterResponse{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutTesterResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutTesterResponse) ProtoMessage() {}
+
+func (x *PutTesterResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutTesterResponse.ProtoReflect.Descriptor instead.
+func (*PutTesterResponse) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *PutTesterResponse) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type DeleteTesterRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTesterRequest) Reset() {
+	*x = DeleteTesterRequest{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTesterRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTesterRequest) ProtoMessage() {}
+
+func (x *DeleteTesterRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTesterRequest.ProtoReflect.Descriptor instead.
+func (*DeleteTesterRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *DeleteTesterRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type DeleteTesterResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTesterResponse) Reset() {
+	*x = DeleteTesterResponse{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTesterResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTesterResponse) ProtoMessage() {}
+
+func (x *DeleteTesterResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTesterResponse.ProtoReflect.Descriptor instead.
+func (*DeleteTesterResponse) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{38}
+}
+
+type ResolveRegionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Stack         string                 `protobuf:"bytes,1,opt,name=stack,proto3" json:"stack,omitempty"`                          // photon | amongus | playfab | gcp | npln
+	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`                          // explicit in-game region in the stack's names; "" = none
+	Country       string                 `protobuf:"bytes,3,opt,name=country,proto3" json:"country,omitempty"`                      // "" = the account's, if named
+	AccountId     string                 `protobuf:"bytes,4,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"` // or link_namespace + link_subject
+	LinkNamespace string                 `protobuf:"bytes,5,opt,name=link_namespace,json=linkNamespace,proto3" json:"link_namespace,omitempty"`
+	LinkSubject   string                 `protobuf:"bytes,6,opt,name=link_subject,json=linkSubject,proto3" json:"link_subject,omitempty"`
+	Service       string                 `protobuf:"bytes,7,opt,name=service,proto3" json:"service,omitempty"` // node role; "" = the stack's default
+	Key           string                 `protobuf:"bytes,8,opt,name=key,proto3" json:"key,omitempty"`         // spreads rooms over a region's nodes
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveRegionRequest) Reset() {
+	*x = ResolveRegionRequest{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveRegionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveRegionRequest) ProtoMessage() {}
+
+func (x *ResolveRegionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveRegionRequest.ProtoReflect.Descriptor instead.
+func (*ResolveRegionRequest) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ResolveRegionRequest) GetStack() string {
+	if x != nil {
+		return x.Stack
+	}
+	return ""
+}
+
+func (x *ResolveRegionRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *ResolveRegionRequest) GetCountry() string {
+	if x != nil {
+		return x.Country
+	}
+	return ""
+}
+
+func (x *ResolveRegionRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ResolveRegionRequest) GetLinkNamespace() string {
+	if x != nil {
+		return x.LinkNamespace
+	}
+	return ""
+}
+
+func (x *ResolveRegionRequest) GetLinkSubject() string {
+	if x != nil {
+		return x.LinkSubject
+	}
+	return ""
+}
+
+func (x *ResolveRegionRequest) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+func (x *ResolveRegionRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+type ResolveRegionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Region        string                 `protobuf:"bytes,1,opt,name=region,proto3" json:"region,omitempty"`
+	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"` // "" = home
+	Address       string                 `protobuf:"bytes,3,opt,name=address,proto3" json:"address,omitempty"`
+	Services      map[string]string      `protobuf:"bytes,4,rep,name=services,proto3" json:"services,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Via           string                 `protobuf:"bytes,5,opt,name=via,proto3" json:"via,omitempty"` // explicit | country | fallback | home
+	Tester        bool                   `protobuf:"varint,6,opt,name=tester,proto3" json:"tester,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveRegionResponse) Reset() {
+	*x = ResolveRegionResponse{}
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveRegionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveRegionResponse) ProtoMessage() {}
+
+func (x *ResolveRegionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_account_v1_federation_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveRegionResponse.ProtoReflect.Descriptor instead.
+func (*ResolveRegionResponse) Descriptor() ([]byte, []int) {
+	return file_openpak_account_v1_federation_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *ResolveRegionResponse) GetRegion() string {
+	if x != nil {
+		return x.Region
+	}
+	return ""
+}
+
+func (x *ResolveRegionResponse) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *ResolveRegionResponse) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *ResolveRegionResponse) GetServices() map[string]string {
+	if x != nil {
+		return x.Services
+	}
+	return nil
+}
+
+func (x *ResolveRegionResponse) GetVia() string {
+	if x != nil {
+		return x.Via
+	}
+	return ""
+}
+
+func (x *ResolveRegionResponse) GetTester() bool {
+	if x != nil {
+		return x.Tester
+	}
+	return false
+}
+
 var File_openpak_account_v1_federation_proto protoreflect.FileDescriptor
 
 const file_openpak_account_v1_federation_proto_rawDesc = "" +
@@ -1893,7 +2497,7 @@ const file_openpak_account_v1_federation_proto_rawDesc = "" +
 	"\x16RecordSelfTestResponse\"\x12\n" +
 	"\x10ListNodesRequest\"C\n" +
 	"\x11ListNodesResponse\x12.\n" +
-	"\x05nodes\x18\x01 \x03(\v2\x18.openpak.account.v1.NodeR\x05nodes\"\xeb\x04\n" +
+	"\x05nodes\x18\x01 \x03(\v2\x18.openpak.account.v1.NodeR\x05nodes\"\xff\x04\n" +
 	"\x04Node\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -1914,7 +2518,8 @@ const file_openpak_account_v1_federation_proto_rawDesc = "" +
 	"totalCores\x12 \n" +
 	"\ftotal_ram_mb\x18\x0f \x01(\x03R\n" +
 	"totalRamMb\x12\"\n" +
-	"\rtotal_disk_gb\x18\x10 \x01(\x03R\vtotalDiskGb\x1a;\n" +
+	"\rtotal_disk_gb\x18\x10 \x01(\x03R\vtotalDiskGb\x12\x12\n" +
+	"\x04test\x18\x11 \x01(\bR\x04test\x1a;\n" +
 	"\rServicesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdc\x03\n" +
@@ -1979,7 +2584,51 @@ const file_openpak_account_v1_federation_proto_rawDesc = "" +
 	"\x13PutLocationResponse\"+\n" +
 	"\x15DeleteLocationRequest\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\"\x18\n" +
-	"\x16DeleteLocationResponse2\xc1\v\n" +
+	"\x16DeleteLocationResponse\"A\n" +
+	"\x12SetNodeTestRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
+	"\x04test\x18\x02 \x01(\bR\x04test\"\x15\n" +
+	"\x13SetNodeTestResponse\"\x14\n" +
+	"\x12ListTestersRequest\"p\n" +
+	"\x06Tester\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\x12\x1d\n" +
+	"\n" +
+	"added_unix\x18\x04 \x01(\x03R\taddedUnix\"K\n" +
+	"\x13ListTestersResponse\x124\n" +
+	"\atesters\x18\x01 \x03(\v2\x1a.openpak.account.v1.TesterR\atesters\"@\n" +
+	"\x10PutTesterRequest\x12\x18\n" +
+	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\"2\n" +
+	"\x11PutTesterResponse\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"4\n" +
+	"\x13DeleteTesterRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"\x16\n" +
+	"\x14DeleteTesterResponse\"\xf1\x01\n" +
+	"\x14ResolveRegionRequest\x12\x14\n" +
+	"\x05stack\x18\x01 \x01(\tR\x05stack\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\x12\x18\n" +
+	"\acountry\x18\x03 \x01(\tR\acountry\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x04 \x01(\tR\taccountId\x12%\n" +
+	"\x0elink_namespace\x18\x05 \x01(\tR\rlinkNamespace\x12!\n" +
+	"\flink_subject\x18\x06 \x01(\tR\vlinkSubject\x12\x18\n" +
+	"\aservice\x18\a \x01(\tR\aservice\x12\x10\n" +
+	"\x03key\x18\b \x01(\tR\x03key\"\x9e\x02\n" +
+	"\x15ResolveRegionResponse\x12\x16\n" +
+	"\x06region\x18\x01 \x01(\tR\x06region\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x18\n" +
+	"\aaddress\x18\x03 \x01(\tR\aaddress\x12S\n" +
+	"\bservices\x18\x04 \x03(\v27.openpak.account.v1.ResolveRegionResponse.ServicesEntryR\bservices\x12\x10\n" +
+	"\x03via\x18\x05 \x01(\tR\x03via\x12\x16\n" +
+	"\x06tester\x18\x06 \x01(\bR\x06tester\x1a;\n" +
+	"\rServicesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xa4\x0f\n" +
 	"\n" +
 	"Federation\x12[\n" +
 	"\n" +
@@ -1998,7 +2647,12 @@ const file_openpak_account_v1_federation_proto_rawDesc = "" +
 	"\x0fGetRequirements\x12*.openpak.account.v1.GetRequirementsRequest\x1a .openpak.account.v1.Requirements\x12d\n" +
 	"\rListLocations\x12(.openpak.account.v1.ListLocationsRequest\x1a).openpak.account.v1.ListLocationsResponse\x12T\n" +
 	"\vPutLocation\x12\x1c.openpak.account.v1.Location\x1a'.openpak.account.v1.PutLocationResponse\x12g\n" +
-	"\x0eDeleteLocation\x12).openpak.account.v1.DeleteLocationRequest\x1a*.openpak.account.v1.DeleteLocationResponseB4Z2openpak/account/proto/openpak/account/v1;accountv1b\x06proto3"
+	"\x0eDeleteLocation\x12).openpak.account.v1.DeleteLocationRequest\x1a*.openpak.account.v1.DeleteLocationResponse\x12^\n" +
+	"\vSetNodeTest\x12&.openpak.account.v1.SetNodeTestRequest\x1a'.openpak.account.v1.SetNodeTestResponse\x12^\n" +
+	"\vListTesters\x12&.openpak.account.v1.ListTestersRequest\x1a'.openpak.account.v1.ListTestersResponse\x12X\n" +
+	"\tPutTester\x12$.openpak.account.v1.PutTesterRequest\x1a%.openpak.account.v1.PutTesterResponse\x12a\n" +
+	"\fDeleteTester\x12'.openpak.account.v1.DeleteTesterRequest\x1a(.openpak.account.v1.DeleteTesterResponse\x12d\n" +
+	"\rResolveRegion\x12(.openpak.account.v1.ResolveRegionRequest\x1a).openpak.account.v1.ResolveRegionResponseB4Z2openpak/account/proto/openpak/account/v1;accountv1b\x06proto3"
 
 var (
 	file_openpak_account_v1_federation_proto_rawDescOnce sync.Once
@@ -2012,7 +2666,7 @@ func file_openpak_account_v1_federation_proto_rawDescGZIP() []byte {
 	return file_openpak_account_v1_federation_proto_rawDescData
 }
 
-var file_openpak_account_v1_federation_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_openpak_account_v1_federation_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_openpak_account_v1_federation_proto_goTypes = []any{
 	(*CreateNodeRequest)(nil),       // 0: openpak.account.v1.CreateNodeRequest
 	(*CreateNodeResponse)(nil),      // 1: openpak.account.v1.CreateNodeResponse
@@ -2044,54 +2698,78 @@ var file_openpak_account_v1_federation_proto_goTypes = []any{
 	(*PutLocationResponse)(nil),     // 27: openpak.account.v1.PutLocationResponse
 	(*DeleteLocationRequest)(nil),   // 28: openpak.account.v1.DeleteLocationRequest
 	(*DeleteLocationResponse)(nil),  // 29: openpak.account.v1.DeleteLocationResponse
-	nil,                             // 30: openpak.account.v1.AnnounceRequest.ServicesEntry
-	nil,                             // 31: openpak.account.v1.Node.ServicesEntry
-	nil,                             // 32: openpak.account.v1.Server.ServicesEntry
+	(*SetNodeTestRequest)(nil),      // 30: openpak.account.v1.SetNodeTestRequest
+	(*SetNodeTestResponse)(nil),     // 31: openpak.account.v1.SetNodeTestResponse
+	(*ListTestersRequest)(nil),      // 32: openpak.account.v1.ListTestersRequest
+	(*Tester)(nil),                  // 33: openpak.account.v1.Tester
+	(*ListTestersResponse)(nil),     // 34: openpak.account.v1.ListTestersResponse
+	(*PutTesterRequest)(nil),        // 35: openpak.account.v1.PutTesterRequest
+	(*PutTesterResponse)(nil),       // 36: openpak.account.v1.PutTesterResponse
+	(*DeleteTesterRequest)(nil),     // 37: openpak.account.v1.DeleteTesterRequest
+	(*DeleteTesterResponse)(nil),    // 38: openpak.account.v1.DeleteTesterResponse
+	(*ResolveRegionRequest)(nil),    // 39: openpak.account.v1.ResolveRegionRequest
+	(*ResolveRegionResponse)(nil),   // 40: openpak.account.v1.ResolveRegionResponse
+	nil,                             // 41: openpak.account.v1.AnnounceRequest.ServicesEntry
+	nil,                             // 42: openpak.account.v1.Node.ServicesEntry
+	nil,                             // 43: openpak.account.v1.Server.ServicesEntry
+	nil,                             // 44: openpak.account.v1.ResolveRegionResponse.ServicesEntry
 }
 var file_openpak_account_v1_federation_proto_depIdxs = []int32{
-	30, // 0: openpak.account.v1.AnnounceRequest.services:type_name -> openpak.account.v1.AnnounceRequest.ServicesEntry
+	41, // 0: openpak.account.v1.AnnounceRequest.services:type_name -> openpak.account.v1.AnnounceRequest.ServicesEntry
 	7,  // 1: openpak.account.v1.AnnounceRequest.report:type_name -> openpak.account.v1.ServerReport
 	16, // 2: openpak.account.v1.ListNodesResponse.nodes:type_name -> openpak.account.v1.Node
-	31, // 3: openpak.account.v1.Node.services:type_name -> openpak.account.v1.Node.ServicesEntry
+	42, // 3: openpak.account.v1.Node.services:type_name -> openpak.account.v1.Node.ServicesEntry
 	17, // 4: openpak.account.v1.Node.servers:type_name -> openpak.account.v1.Server
-	32, // 5: openpak.account.v1.Server.services:type_name -> openpak.account.v1.Server.ServicesEntry
+	43, // 5: openpak.account.v1.Server.services:type_name -> openpak.account.v1.Server.ServicesEntry
 	7,  // 6: openpak.account.v1.Server.report:type_name -> openpak.account.v1.ServerReport
 	26, // 7: openpak.account.v1.ListLocationsResponse.locations:type_name -> openpak.account.v1.Location
-	0,  // 8: openpak.account.v1.Federation.CreateNode:input_type -> openpak.account.v1.CreateNodeRequest
-	2,  // 9: openpak.account.v1.Federation.RotateNodeKey:input_type -> openpak.account.v1.RotateNodeKeyRequest
-	3,  // 10: openpak.account.v1.Federation.JoinServer:input_type -> openpak.account.v1.JoinServerRequest
-	5,  // 11: openpak.account.v1.Federation.RevokeServer:input_type -> openpak.account.v1.RevokeServerRequest
-	8,  // 12: openpak.account.v1.Federation.Announce:input_type -> openpak.account.v1.AnnounceRequest
-	10, // 13: openpak.account.v1.Federation.StartSelfTest:input_type -> openpak.account.v1.StartSelfTestRequest
-	12, // 14: openpak.account.v1.Federation.RecordSelfTest:input_type -> openpak.account.v1.RecordSelfTestRequest
-	14, // 15: openpak.account.v1.Federation.ListNodes:input_type -> openpak.account.v1.ListNodesRequest
-	14, // 16: openpak.account.v1.Federation.ListAllNodes:input_type -> openpak.account.v1.ListNodesRequest
-	18, // 17: openpak.account.v1.Federation.SetNodeApproved:input_type -> openpak.account.v1.SetNodeApprovedRequest
-	20, // 18: openpak.account.v1.Federation.SetNodeWaiver:input_type -> openpak.account.v1.SetNodeWaiverRequest
-	22, // 19: openpak.account.v1.Federation.GetRequirements:input_type -> openpak.account.v1.GetRequirementsRequest
-	24, // 20: openpak.account.v1.Federation.ListLocations:input_type -> openpak.account.v1.ListLocationsRequest
-	26, // 21: openpak.account.v1.Federation.PutLocation:input_type -> openpak.account.v1.Location
-	28, // 22: openpak.account.v1.Federation.DeleteLocation:input_type -> openpak.account.v1.DeleteLocationRequest
-	1,  // 23: openpak.account.v1.Federation.CreateNode:output_type -> openpak.account.v1.CreateNodeResponse
-	1,  // 24: openpak.account.v1.Federation.RotateNodeKey:output_type -> openpak.account.v1.CreateNodeResponse
-	4,  // 25: openpak.account.v1.Federation.JoinServer:output_type -> openpak.account.v1.JoinServerResponse
-	6,  // 26: openpak.account.v1.Federation.RevokeServer:output_type -> openpak.account.v1.RevokeServerResponse
-	9,  // 27: openpak.account.v1.Federation.Announce:output_type -> openpak.account.v1.AnnounceResponse
-	11, // 28: openpak.account.v1.Federation.StartSelfTest:output_type -> openpak.account.v1.StartSelfTestResponse
-	13, // 29: openpak.account.v1.Federation.RecordSelfTest:output_type -> openpak.account.v1.RecordSelfTestResponse
-	15, // 30: openpak.account.v1.Federation.ListNodes:output_type -> openpak.account.v1.ListNodesResponse
-	15, // 31: openpak.account.v1.Federation.ListAllNodes:output_type -> openpak.account.v1.ListNodesResponse
-	19, // 32: openpak.account.v1.Federation.SetNodeApproved:output_type -> openpak.account.v1.SetNodeApprovedResponse
-	21, // 33: openpak.account.v1.Federation.SetNodeWaiver:output_type -> openpak.account.v1.SetNodeWaiverResponse
-	23, // 34: openpak.account.v1.Federation.GetRequirements:output_type -> openpak.account.v1.Requirements
-	25, // 35: openpak.account.v1.Federation.ListLocations:output_type -> openpak.account.v1.ListLocationsResponse
-	27, // 36: openpak.account.v1.Federation.PutLocation:output_type -> openpak.account.v1.PutLocationResponse
-	29, // 37: openpak.account.v1.Federation.DeleteLocation:output_type -> openpak.account.v1.DeleteLocationResponse
-	23, // [23:38] is the sub-list for method output_type
-	8,  // [8:23] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	33, // 8: openpak.account.v1.ListTestersResponse.testers:type_name -> openpak.account.v1.Tester
+	44, // 9: openpak.account.v1.ResolveRegionResponse.services:type_name -> openpak.account.v1.ResolveRegionResponse.ServicesEntry
+	0,  // 10: openpak.account.v1.Federation.CreateNode:input_type -> openpak.account.v1.CreateNodeRequest
+	2,  // 11: openpak.account.v1.Federation.RotateNodeKey:input_type -> openpak.account.v1.RotateNodeKeyRequest
+	3,  // 12: openpak.account.v1.Federation.JoinServer:input_type -> openpak.account.v1.JoinServerRequest
+	5,  // 13: openpak.account.v1.Federation.RevokeServer:input_type -> openpak.account.v1.RevokeServerRequest
+	8,  // 14: openpak.account.v1.Federation.Announce:input_type -> openpak.account.v1.AnnounceRequest
+	10, // 15: openpak.account.v1.Federation.StartSelfTest:input_type -> openpak.account.v1.StartSelfTestRequest
+	12, // 16: openpak.account.v1.Federation.RecordSelfTest:input_type -> openpak.account.v1.RecordSelfTestRequest
+	14, // 17: openpak.account.v1.Federation.ListNodes:input_type -> openpak.account.v1.ListNodesRequest
+	14, // 18: openpak.account.v1.Federation.ListAllNodes:input_type -> openpak.account.v1.ListNodesRequest
+	18, // 19: openpak.account.v1.Federation.SetNodeApproved:input_type -> openpak.account.v1.SetNodeApprovedRequest
+	20, // 20: openpak.account.v1.Federation.SetNodeWaiver:input_type -> openpak.account.v1.SetNodeWaiverRequest
+	22, // 21: openpak.account.v1.Federation.GetRequirements:input_type -> openpak.account.v1.GetRequirementsRequest
+	24, // 22: openpak.account.v1.Federation.ListLocations:input_type -> openpak.account.v1.ListLocationsRequest
+	26, // 23: openpak.account.v1.Federation.PutLocation:input_type -> openpak.account.v1.Location
+	28, // 24: openpak.account.v1.Federation.DeleteLocation:input_type -> openpak.account.v1.DeleteLocationRequest
+	30, // 25: openpak.account.v1.Federation.SetNodeTest:input_type -> openpak.account.v1.SetNodeTestRequest
+	32, // 26: openpak.account.v1.Federation.ListTesters:input_type -> openpak.account.v1.ListTestersRequest
+	35, // 27: openpak.account.v1.Federation.PutTester:input_type -> openpak.account.v1.PutTesterRequest
+	37, // 28: openpak.account.v1.Federation.DeleteTester:input_type -> openpak.account.v1.DeleteTesterRequest
+	39, // 29: openpak.account.v1.Federation.ResolveRegion:input_type -> openpak.account.v1.ResolveRegionRequest
+	1,  // 30: openpak.account.v1.Federation.CreateNode:output_type -> openpak.account.v1.CreateNodeResponse
+	1,  // 31: openpak.account.v1.Federation.RotateNodeKey:output_type -> openpak.account.v1.CreateNodeResponse
+	4,  // 32: openpak.account.v1.Federation.JoinServer:output_type -> openpak.account.v1.JoinServerResponse
+	6,  // 33: openpak.account.v1.Federation.RevokeServer:output_type -> openpak.account.v1.RevokeServerResponse
+	9,  // 34: openpak.account.v1.Federation.Announce:output_type -> openpak.account.v1.AnnounceResponse
+	11, // 35: openpak.account.v1.Federation.StartSelfTest:output_type -> openpak.account.v1.StartSelfTestResponse
+	13, // 36: openpak.account.v1.Federation.RecordSelfTest:output_type -> openpak.account.v1.RecordSelfTestResponse
+	15, // 37: openpak.account.v1.Federation.ListNodes:output_type -> openpak.account.v1.ListNodesResponse
+	15, // 38: openpak.account.v1.Federation.ListAllNodes:output_type -> openpak.account.v1.ListNodesResponse
+	19, // 39: openpak.account.v1.Federation.SetNodeApproved:output_type -> openpak.account.v1.SetNodeApprovedResponse
+	21, // 40: openpak.account.v1.Federation.SetNodeWaiver:output_type -> openpak.account.v1.SetNodeWaiverResponse
+	23, // 41: openpak.account.v1.Federation.GetRequirements:output_type -> openpak.account.v1.Requirements
+	25, // 42: openpak.account.v1.Federation.ListLocations:output_type -> openpak.account.v1.ListLocationsResponse
+	27, // 43: openpak.account.v1.Federation.PutLocation:output_type -> openpak.account.v1.PutLocationResponse
+	29, // 44: openpak.account.v1.Federation.DeleteLocation:output_type -> openpak.account.v1.DeleteLocationResponse
+	31, // 45: openpak.account.v1.Federation.SetNodeTest:output_type -> openpak.account.v1.SetNodeTestResponse
+	34, // 46: openpak.account.v1.Federation.ListTesters:output_type -> openpak.account.v1.ListTestersResponse
+	36, // 47: openpak.account.v1.Federation.PutTester:output_type -> openpak.account.v1.PutTesterResponse
+	38, // 48: openpak.account.v1.Federation.DeleteTester:output_type -> openpak.account.v1.DeleteTesterResponse
+	40, // 49: openpak.account.v1.Federation.ResolveRegion:output_type -> openpak.account.v1.ResolveRegionResponse
+	30, // [30:50] is the sub-list for method output_type
+	10, // [10:30] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_openpak_account_v1_federation_proto_init() }
@@ -2105,7 +2783,7 @@ func file_openpak_account_v1_federation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_openpak_account_v1_federation_proto_rawDesc), len(file_openpak_account_v1_federation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   33,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

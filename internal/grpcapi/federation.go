@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"openpak/account/internal/federation"
+	"openpak/account/pkg/routing"
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
 
@@ -124,7 +125,7 @@ func (s *Server) ListNodes(ctx context.Context, _ *accountv1.ListNodesRequest) (
 	if err := s.fed(ctx); err != nil {
 		return nil, err
 	}
-	nodes, err := s.federation.List(ctx)
+	nodes, err := s.federation.PublicList(ctx) // test nodes are never public
 	if err != nil {
 		return nil, mapFederationErr(err)
 	}
@@ -153,7 +154,7 @@ func (s *Server) ListAllNodes(ctx context.Context, _ *accountv1.ListNodesRequest
 			NodeId: n.ID, Name: n.Name, Country: n.Country, Region: n.Region, Services: n.Services,
 			LastSeenUnix: unix(n.LastSeen), Approved: n.Approved, InRotation: n.InRotation, Problems: n.Problems,
 			WaiverReason: n.WaiverReason, WaiverUntilUnix: unix(n.WaiverUntil), Waived: n.Waived(now),
-			TotalCores: int32(n.TotalCores), TotalRamMb: n.TotalRAMMB, TotalDiskGb: n.TotalDiskGB,
+			TotalCores: int32(n.TotalCores), TotalRamMb: n.TotalRAMMB, TotalDiskGb: n.TotalDiskGB, Test: n.Test,
 		}
 		for _, v := range n.Servers {
 			pn.Servers = append(pn.Servers, &accountv1.Server{
@@ -244,6 +245,75 @@ func (s *Server) DeleteLocation(ctx context.Context, req *accountv1.DeleteLocati
 		return nil, mapFederationErr(err)
 	}
 	return &accountv1.DeleteLocationResponse{}, nil
+}
+
+func (s *Server) SetNodeTest(ctx context.Context, req *accountv1.SetNodeTestRequest) (*accountv1.SetNodeTestResponse, error) {
+	if err := s.homeOnly(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.federation.SetTest(ctx, req.GetNodeId(), req.GetTest()); err != nil {
+		return nil, mapFederationErr(err)
+	}
+	return &accountv1.SetNodeTestResponse{}, nil
+}
+
+func (s *Server) ListTesters(ctx context.Context, _ *accountv1.ListTestersRequest) (*accountv1.ListTestersResponse, error) {
+	if err := s.homeOnly(ctx); err != nil {
+		return nil, err
+	}
+	ts, err := s.federation.ListTesters(ctx)
+	if err != nil {
+		return nil, mapFederationErr(err)
+	}
+	resp := &accountv1.ListTestersResponse{}
+	for _, t := range ts {
+		resp.Testers = append(resp.Testers, &accountv1.Tester{AccountId: t.AccountID, Email: t.Email, Note: t.Note, AddedUnix: unix(t.Added)})
+	}
+	return resp, nil
+}
+
+func (s *Server) PutTester(ctx context.Context, req *accountv1.PutTesterRequest) (*accountv1.PutTesterResponse, error) {
+	if err := s.homeOnly(ctx); err != nil {
+		return nil, err
+	}
+	id, err := s.federation.PutTester(ctx, req.GetAccount(), req.GetNote())
+	if err != nil {
+		return nil, mapFederationErr(err)
+	}
+	return &accountv1.PutTesterResponse{AccountId: id}, nil
+}
+
+func (s *Server) DeleteTester(ctx context.Context, req *accountv1.DeleteTesterRequest) (*accountv1.DeleteTesterResponse, error) {
+	if err := s.homeOnly(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.federation.DeleteTester(ctx, req.GetAccountId()); err != nil {
+		return nil, mapFederationErr(err)
+	}
+	return &accountv1.DeleteTesterResponse{}, nil
+}
+
+// ResolveRegion answers home rather than failing whenever the core cannot
+// read its own tables: a console must never see a routing error.
+func (s *Server) ResolveRegion(ctx context.Context, req *accountv1.ResolveRegionRequest) (*accountv1.ResolveRegionResponse, error) {
+	if err := s.homeOnly(ctx); err != nil {
+		return nil, err
+	}
+	r := routing.Request{Stack: req.GetStack(), Token: req.GetToken(), Country: req.GetCountry(), Service: req.GetService(), Key: req.GetKey()}
+	ref := routing.AccountRef{AccountID: req.GetAccountId(), Namespace: req.GetLinkNamespace(), Subject: req.GetLinkSubject()}
+	if a, err := s.federation.AccountRouting(ctx, ref); err == nil {
+		r.Tester = a.Tester
+		if r.Country == "" {
+			r.Country = a.Country
+		}
+	}
+	t, err := s.federation.RoutingTable(ctx)
+	if err != nil {
+		t = nil
+	}
+	res := t.Resolve(r)
+	return &accountv1.ResolveRegionResponse{Region: res.Region, NodeId: res.Node, Address: res.Address, Services: res.Services,
+		Via: res.Via, Tester: r.Tester}, nil
 }
 
 func unix(t time.Time) int64 {

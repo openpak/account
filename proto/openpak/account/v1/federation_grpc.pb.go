@@ -34,6 +34,11 @@ const (
 	Federation_ListLocations_FullMethodName   = "/openpak.account.v1.Federation/ListLocations"
 	Federation_PutLocation_FullMethodName     = "/openpak.account.v1.Federation/PutLocation"
 	Federation_DeleteLocation_FullMethodName  = "/openpak.account.v1.Federation/DeleteLocation"
+	Federation_SetNodeTest_FullMethodName     = "/openpak.account.v1.Federation/SetNodeTest"
+	Federation_ListTesters_FullMethodName     = "/openpak.account.v1.Federation/ListTesters"
+	Federation_PutTester_FullMethodName       = "/openpak.account.v1.Federation/PutTester"
+	Federation_DeleteTester_FullMethodName    = "/openpak.account.v1.Federation/DeleteTester"
+	Federation_ResolveRegion_FullMethodName   = "/openpak.account.v1.Federation/ResolveRegion"
 )
 
 // FederationClient is the client API for Federation service.
@@ -88,6 +93,16 @@ type FederationClient interface {
 	ListLocations(ctx context.Context, in *ListLocationsRequest, opts ...grpc.CallOption) (*ListLocationsResponse, error)
 	PutLocation(ctx context.Context, in *Location, opts ...grpc.CallOption) (*PutLocationResponse, error)
 	DeleteLocation(ctx context.Context, in *DeleteLocationRequest, opts ...grpc.CallOption) (*DeleteLocationResponse, error)
+	// Home only: flags a test node. A test node is never in ListNodes (the
+	// public list) and is routed only to accounts on the test allow-list.
+	SetNodeTest(ctx context.Context, in *SetNodeTestRequest, opts ...grpc.CallOption) (*SetNodeTestResponse, error)
+	// Home only: the test allow-list.
+	ListTesters(ctx context.Context, in *ListTestersRequest, opts ...grpc.CallOption) (*ListTestersResponse, error)
+	PutTester(ctx context.Context, in *PutTesterRequest, opts ...grpc.CallOption) (*PutTesterResponse, error)
+	DeleteTester(ctx context.Context, in *DeleteTesterRequest, opts ...grpc.CallOption) (*DeleteTesterResponse, error)
+	// Home only: where a new room goes (pkg/routing). Never fails for an
+	// unknown token, country or account: the answer is then home.
+	ResolveRegion(ctx context.Context, in *ResolveRegionRequest, opts ...grpc.CallOption) (*ResolveRegionResponse, error)
 }
 
 type federationClient struct {
@@ -248,6 +263,56 @@ func (c *federationClient) DeleteLocation(ctx context.Context, in *DeleteLocatio
 	return out, nil
 }
 
+func (c *federationClient) SetNodeTest(ctx context.Context, in *SetNodeTestRequest, opts ...grpc.CallOption) (*SetNodeTestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetNodeTestResponse)
+	err := c.cc.Invoke(ctx, Federation_SetNodeTest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) ListTesters(ctx context.Context, in *ListTestersRequest, opts ...grpc.CallOption) (*ListTestersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTestersResponse)
+	err := c.cc.Invoke(ctx, Federation_ListTesters_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) PutTester(ctx context.Context, in *PutTesterRequest, opts ...grpc.CallOption) (*PutTesterResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PutTesterResponse)
+	err := c.cc.Invoke(ctx, Federation_PutTester_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) DeleteTester(ctx context.Context, in *DeleteTesterRequest, opts ...grpc.CallOption) (*DeleteTesterResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteTesterResponse)
+	err := c.cc.Invoke(ctx, Federation_DeleteTester_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) ResolveRegion(ctx context.Context, in *ResolveRegionRequest, opts ...grpc.CallOption) (*ResolveRegionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveRegionResponse)
+	err := c.cc.Invoke(ctx, Federation_ResolveRegion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FederationServer is the server API for Federation service.
 // All implementations must embed UnimplementedFederationServer
 // for forward compatibility.
@@ -300,6 +365,16 @@ type FederationServer interface {
 	ListLocations(context.Context, *ListLocationsRequest) (*ListLocationsResponse, error)
 	PutLocation(context.Context, *Location) (*PutLocationResponse, error)
 	DeleteLocation(context.Context, *DeleteLocationRequest) (*DeleteLocationResponse, error)
+	// Home only: flags a test node. A test node is never in ListNodes (the
+	// public list) and is routed only to accounts on the test allow-list.
+	SetNodeTest(context.Context, *SetNodeTestRequest) (*SetNodeTestResponse, error)
+	// Home only: the test allow-list.
+	ListTesters(context.Context, *ListTestersRequest) (*ListTestersResponse, error)
+	PutTester(context.Context, *PutTesterRequest) (*PutTesterResponse, error)
+	DeleteTester(context.Context, *DeleteTesterRequest) (*DeleteTesterResponse, error)
+	// Home only: where a new room goes (pkg/routing). Never fails for an
+	// unknown token, country or account: the answer is then home.
+	ResolveRegion(context.Context, *ResolveRegionRequest) (*ResolveRegionResponse, error)
 	mustEmbedUnimplementedFederationServer()
 }
 
@@ -354,6 +429,21 @@ func (UnimplementedFederationServer) PutLocation(context.Context, *Location) (*P
 }
 func (UnimplementedFederationServer) DeleteLocation(context.Context, *DeleteLocationRequest) (*DeleteLocationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteLocation not implemented")
+}
+func (UnimplementedFederationServer) SetNodeTest(context.Context, *SetNodeTestRequest) (*SetNodeTestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetNodeTest not implemented")
+}
+func (UnimplementedFederationServer) ListTesters(context.Context, *ListTestersRequest) (*ListTestersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTesters not implemented")
+}
+func (UnimplementedFederationServer) PutTester(context.Context, *PutTesterRequest) (*PutTesterResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PutTester not implemented")
+}
+func (UnimplementedFederationServer) DeleteTester(context.Context, *DeleteTesterRequest) (*DeleteTesterResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteTester not implemented")
+}
+func (UnimplementedFederationServer) ResolveRegion(context.Context, *ResolveRegionRequest) (*ResolveRegionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveRegion not implemented")
 }
 func (UnimplementedFederationServer) mustEmbedUnimplementedFederationServer() {}
 func (UnimplementedFederationServer) testEmbeddedByValue()                    {}
@@ -646,6 +736,96 @@ func _Federation_DeleteLocation_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Federation_SetNodeTest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetNodeTestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).SetNodeTest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_SetNodeTest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).SetNodeTest(ctx, req.(*SetNodeTestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_ListTesters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTestersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).ListTesters(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_ListTesters_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).ListTesters(ctx, req.(*ListTestersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_PutTester_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PutTesterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).PutTester(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_PutTester_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).PutTester(ctx, req.(*PutTesterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_DeleteTester_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTesterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).DeleteTester(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_DeleteTester_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).DeleteTester(ctx, req.(*DeleteTesterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_ResolveRegion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveRegionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).ResolveRegion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_ResolveRegion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).ResolveRegion(ctx, req.(*ResolveRegionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Federation_ServiceDesc is the grpc.ServiceDesc for Federation service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -712,6 +892,26 @@ var Federation_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteLocation",
 			Handler:    _Federation_DeleteLocation_Handler,
+		},
+		{
+			MethodName: "SetNodeTest",
+			Handler:    _Federation_SetNodeTest_Handler,
+		},
+		{
+			MethodName: "ListTesters",
+			Handler:    _Federation_ListTesters_Handler,
+		},
+		{
+			MethodName: "PutTester",
+			Handler:    _Federation_PutTester_Handler,
+		},
+		{
+			MethodName: "DeleteTester",
+			Handler:    _Federation_DeleteTester_Handler,
+		},
+		{
+			MethodName: "ResolveRegion",
+			Handler:    _Federation_ResolveRegion_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

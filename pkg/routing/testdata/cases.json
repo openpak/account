@@ -1,0 +1,32 @@
+{
+  "comment": "Shared resolver cases. The Go tests (pkg/routing) and the Photon C# tests run the same file; the regions are the built-in registry, only the nodes are given here.",
+  "nodes": [
+    {"id": "br-gru-1", "region": "sa-east", "country": "BR", "services": {"photon": "198.51.100.10:5056", "photon_ping": "198.51.100.10:5055", "turn": "198.51.100.10:3478", "impostor": "198.51.100.10:22023", "playfab_party": "198.51.100.10:3074"}},
+    {"id": "us-ash-1", "region": "us-east", "country": "US", "services": {"photon": "198.51.100.20:5056", "turn": "198.51.100.20:3478"}},
+    {"id": "jp-tyo-test", "region": "ap-northeast", "country": "JP", "test": true, "services": {"photon": "198.51.100.30:5056", "turn": "198.51.100.30:3478"}},
+    {"id": "au-syd-legacy", "region": "", "country": "AU", "services": {"turn": "198.51.100.40:3478"}}
+  ],
+  "cases": [
+    {"name": "explicit Japan from Brazil, no public Japan node: fallback chain ends home", "stack": "photon", "token": "jp/*", "country": "BR", "want_node": "", "want_region": "eu-west", "want_via": "home"},
+    {"name": "explicit Japan from Brazil, tester: the Japan test node", "stack": "photon", "token": "jp/*", "country": "BR", "tester": true, "want_node": "jp-tyo-test", "want_region": "ap-northeast", "want_via": "explicit"},
+    {"name": "explicit South America from Germany wins over country", "stack": "photon", "token": "sa/*", "country": "DE", "want_node": "br-gru-1", "want_region": "sa-east", "want_via": "explicit"},
+    {"name": "explicit Europe from Brazil is home", "stack": "photon", "token": "eu", "country": "BR", "want_node": "", "want_region": "eu-west", "want_via": "home"},
+    {"name": "unknown token is home, never a guess", "stack": "photon", "token": "nx", "country": "BR", "want_node": "", "want_region": "eu-west", "want_via": "home"},
+    {"name": "no choice: country Brazil", "stack": "photon", "country": "BR", "want_node": "br-gru-1", "want_region": "sa-east", "want_via": "country"},
+    {"name": "no choice, no country: home", "stack": "photon", "want_node": "", "want_region": "eu-west", "want_via": "home"},
+    {"name": "no choice: Mexico has no node, falls back to us-east", "stack": "photon", "country": "MX", "want_node": "us-ash-1", "want_region": "us-east", "want_via": "fallback"},
+    {"name": "Japan country, not a tester: test node invisible", "stack": "photon", "country": "JP", "want_node": "", "want_region": "eu-west", "want_via": "home"},
+    {"name": "explicit usw falls back to us-east", "stack": "photon", "token": "usw/*", "country": "BR", "want_node": "us-ash-1", "want_region": "us-east", "want_via": "fallback"},
+    {"name": "Among Us na from Brazil refines to sa-east", "stack": "amongus", "token": "na", "country": "BR", "want_node": "br-gru-1", "want_region": "sa-east", "want_via": "explicit"},
+    {"name": "Among Us na from France: primary us-east lacks impostor, home", "stack": "amongus", "token": "na", "country": "FR", "want_node": "", "want_region": "eu-west", "want_via": "home"},
+    {"name": "PlayFab BrazilSouth", "stack": "playfab", "token": "BrazilSouth", "country": "JP", "want_node": "br-gru-1", "want_region": "sa-east", "want_via": "explicit"},
+    {"name": "PlayFab token is case-insensitive", "stack": "playfab", "token": "brazilsouth", "want_node": "br-gru-1", "want_region": "sa-east", "want_via": "explicit"},
+    {"name": "NPLN host in Brazil: TURN in sa-east", "stack": "npln", "country": "BR", "want_node": "br-gru-1", "want_region": "sa-east", "want_via": "country"},
+    {"name": "NPLN host in Australia: legacy node without region code", "stack": "npln", "country": "AU", "want_node": "au-syd-legacy", "want_region": "oc", "want_via": "country"},
+    {"name": "NPLN host in New Zealand", "stack": "npln", "country": "nz", "want_node": "au-syd-legacy", "want_region": "oc", "want_via": "country"},
+    {"name": "China goes to the neighbours, tester reaches Japan", "stack": "npln", "country": "CN", "tester": true, "want_node": "jp-tyo-test", "want_region": "ap-northeast", "want_via": "country"},
+    {"name": "China, not a tester: home", "stack": "npln", "country": "CN", "want_node": "", "want_region": "eu-west", "want_via": "home"},
+    {"name": "Russia with no Finland or Kazakhstan node: home", "stack": "npln", "country": "RU", "want_node": "", "want_region": "eu-west", "want_via": "home"},
+    {"name": "unknown stack: home", "stack": "klei", "country": "BR", "want_node": "", "want_region": "eu-west", "want_via": "home"}
+  ]
+}

@@ -162,9 +162,15 @@ func run() error {
 
 	errCh := make(chan error, 2)
 	go func() { errCh <- grpcSrv.Serve(grpcListener) }()
+	// Game servers at home read the routing table with their own read-only
+	// key (ACCOUNT_ROUTING_KEY), never the internal key. Unset: refused.
+	httpMux := http.NewServeMux()
+	httpMux.Handle("/internal/v1/routing", federation.RoutingHandler(fedSvc, os.Getenv("ACCOUNT_ROUTING_KEY")))
+	httpMux.Handle("/internal/v1/routing/", federation.RoutingHandler(fedSvc, os.Getenv("ACCOUNT_ROUTING_KEY")))
+	httpMux.Handle("/", web.New(ident, m, os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), os.Getenv("ACCOUNT_EMAIL_LINK_BASE")))
 	httpSrv := &http.Server{
 		Addr:              cfg.HTTPListenAddr,
-		Handler:           web.New(ident, m, os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), os.Getenv("ACCOUNT_EMAIL_LINK_BASE")),
+		Handler:           httpMux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

@@ -21,6 +21,7 @@ import (
 	"net/netip"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -53,8 +54,10 @@ var (
 )
 
 // Roles a server may announce. They are the transports a node can carry (see
-// research/federation.md): Photon's Game role, and STUN/TURN for NPLN.
-var Roles = []string{"photon", "turn", "stun", "npln_relay"}
+// research/federation.md): Photon's Game role and its region ping responder
+// (UDP 5055), STUN/TURN for NPLN, Among Us's Impostor, and PlayFab Party's
+// relay and QoS beacon.
+var Roles = []string{"photon", "photon_ping", "turn", "stun", "npln_relay", "impostor", "playfab_party", "playfab_qos"}
 
 // Node is one region. Services, LastSeen, the totals, Problems and InRotation
 // are derived from its servers by evaluate; they are not stored.
@@ -66,6 +69,9 @@ type Node struct {
 	Services map[string]string
 	LastSeen time.Time
 	Approved bool
+	// Test: an OpenPak test node. Never in the public list; routed only to
+	// accounts on the test allow-list (routing.go).
+	Test bool
 
 	WaiverReason string
 	WaiverUntil  time.Time // zero: no expiry
@@ -120,6 +126,9 @@ type Service struct {
 	homeKey string
 	Req     Requirements
 	now     func() time.Time
+
+	routingMu sync.Mutex
+	routing   routingCache
 }
 
 func New(pool *pgxpool.Pool, homeKey string) *Service {
@@ -246,6 +255,7 @@ func (s *Service) RevokeServer(ctx context.Context, id string) error {
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
 	}
+	s.invalidateRouting()
 	return nil
 }
 
@@ -294,6 +304,7 @@ func (s *Service) Announce(ctx context.Context, c Caller, services map[string]st
 	if tag.RowsAffected() == 0 {
 		return AnnounceResult{}, ErrNotFound
 	}
+	s.invalidateRouting() // a new address or a server back in rotation shows at once
 	n, err := s.Get(ctx, c.Node)
 	if err != nil {
 		return AnnounceResult{}, err
@@ -393,6 +404,7 @@ func (s *Service) SetApproved(ctx context.Context, id string, approved bool) err
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
 	}
+	s.invalidateRouting()
 	return nil
 }
 
@@ -415,10 +427,12 @@ func (s *Service) SetWaiver(ctx context.Context, id, reason string, until time.T
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
 	}
+	s.invalidateRouting()
 	return nil
 }
 
-// List returns the nodes that may be handed out: approved and in rotation.
+// List returns the nodes that may be handed out: approved and in rotation,
+// test nodes included. Public answers use PublicList.
 func (s *Service) List(ctx context.Context) ([]Node, error) {
 	all, err := s.ListAll(ctx)
 	if err != nil {
@@ -431,6 +445,34 @@ func (s *Service) List(ctx context.Context) ([]Node, error) {
 		}
 	}
 	return out, nil
+}
+
+// PublicList is List without test nodes: what /api/v1/regions shows.
+func (s *Service) PublicList(ctx context.Context) ([]Node, error) {
+	all, err := s.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := all[:0]
+	for _, n := range all {
+		if !n.Test {
+			out = append(out, n)
+		}
+	}
+	return out, nil
+}
+
+// SetTest flags or unflags a test node.
+func (s *Service) SetTest(ctx context.Context, id string, test bool) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE federation_nodes SET test=$2 WHERE id=$1`, id, test)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	s.invalidateRouting()
+	return nil
 }
 
 // Get is one node, evaluated.
@@ -451,7 +493,7 @@ func (s *Service) ListAll(ctx context.Context) ([]Node, error) {
 }
 
 func (s *Service) query(ctx context.Context, where string, args ...any) ([]Node, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id, name, country, region, approved, waiver_reason, coalesce(waiver_until, 'epoch'::timestamptz)
+	rows, err := s.pool.Query(ctx, `SELECT id, name, country, region, approved, test, waiver_reason, coalesce(waiver_until, 'epoch'::timestamptz)
 		FROM federation_nodes `+where+` ORDER BY id`, args...)
 	if err != nil {
 		return nil, err
@@ -460,7 +502,7 @@ func (s *Service) query(ctx context.Context, where string, args ...any) ([]Node,
 	idx := map[string]int{}
 	for rows.Next() {
 		var n Node
-		if err := rows.Scan(&n.ID, &n.Name, &n.Country, &n.Region, &n.Approved, &n.WaiverReason, &n.WaiverUntil); err != nil {
+		if err := rows.Scan(&n.ID, &n.Name, &n.Country, &n.Region, &n.Approved, &n.Test, &n.WaiverReason, &n.WaiverUntil); err != nil {
 			rows.Close()
 			return nil, err
 		}

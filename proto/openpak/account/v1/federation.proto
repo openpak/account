@@ -52,6 +52,17 @@ service Federation {
   rpc ListLocations(ListLocationsRequest) returns (ListLocationsResponse);
   rpc PutLocation(Location) returns (PutLocationResponse);           // home only
   rpc DeleteLocation(DeleteLocationRequest) returns (DeleteLocationResponse); // home only
+
+  // Home only: flags a test node. A test node is never in ListNodes (the
+  // public list) and is routed only to accounts on the test allow-list.
+  rpc SetNodeTest(SetNodeTestRequest) returns (SetNodeTestResponse);
+  // Home only: the test allow-list.
+  rpc ListTesters(ListTestersRequest) returns (ListTestersResponse);
+  rpc PutTester(PutTesterRequest) returns (PutTesterResponse);
+  rpc DeleteTester(DeleteTesterRequest) returns (DeleteTesterResponse);
+  // Home only: where a new room goes (pkg/routing). Never fails for an
+  // unknown token, country or account: the answer is then home.
+  rpc ResolveRegion(ResolveRegionRequest) returns (ResolveRegionResponse);
 }
 
 message CreateNodeRequest {
@@ -155,6 +166,7 @@ message Node {
   int32 total_cores = 14;
   int64 total_ram_mb = 15;
   int64 total_disk_gb = 16;
+  bool test = 17;               // admin view only; test nodes are never in ListNodes
 }
 
 message Server {
@@ -229,3 +241,58 @@ message DeleteLocationRequest {
 }
 
 message DeleteLocationResponse {}
+
+message SetNodeTestRequest {
+  string node_id = 1;
+  bool test = 2;
+}
+
+message SetNodeTestResponse {}
+
+message ListTestersRequest {}
+
+message Tester {
+  string account_id = 1;
+  string email = 2;
+  string note = 3;
+  int64 added_unix = 4;
+}
+
+message ListTestersResponse {
+  repeated Tester testers = 1;
+}
+
+message PutTesterRequest {
+  string account = 1;   // account id or sign-in email
+  string note = 2;
+}
+
+message PutTesterResponse {
+  string account_id = 1;
+}
+
+message DeleteTesterRequest {
+  string account_id = 1;
+}
+
+message DeleteTesterResponse {}
+
+message ResolveRegionRequest {
+  string stack = 1;          // photon | amongus | playfab | gcp | npln
+  string token = 2;          // explicit in-game region in the stack's names; "" = none
+  string country = 3;        // "" = the account's, if named
+  string account_id = 4;     // or link_namespace + link_subject
+  string link_namespace = 5;
+  string link_subject = 6;
+  string service = 7;        // node role; "" = the stack's default
+  string key = 8;            // spreads rooms over a region's nodes
+}
+
+message ResolveRegionResponse {
+  string region = 1;
+  string node_id = 2;        // "" = home
+  string address = 3;
+  map<string, string> services = 4;
+  string via = 5;            // explicit | country | fallback | home
+  bool tester = 6;
+}
