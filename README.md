@@ -3,9 +3,9 @@
 Console-agnostic identity service: accounts, web sessions, email
 verification/recovery, generic adapter links, moderation foundation, and the
 canonical friend graph (in progress). Wii U/3DS protocols live in
-[`nn-account`](../nn-account); this core never imports Nintendo protocol code.
+[`nn-account`](../../platforms/wiiu-3ds/infra/nn-account); this core never imports Nintendo protocol code.
 
-Status: **M1 in progress** — see `PRD.md` in `../nn-account` for scope.
+Status: **M1 in progress** — see `PRD.md` in `../../platforms/wiiu-3ds/infra/nn-account` for scope.
 
 ## Run
 
