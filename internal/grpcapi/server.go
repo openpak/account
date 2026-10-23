@@ -109,16 +109,29 @@ func (s *Server) EmitEvent(ctx context.Context, req *accountv1.EmitEventRequest)
 	return &accountv1.EmitEventResponse{Event: ev}, nil
 }
 
-// NodeAuth resolves a presented credential to a federation node id.
+// NodeAuth resolves a presented credential to a federation caller, and says
+// whether a region node is admitted (approved and in rotation).
 type NodeAuth interface {
-	Authenticate(ctx context.Context, key string) (string, bool)
+	Authenticate(ctx context.Context, key string) (federation.Caller, bool)
+	Admitted(ctx context.Context, node string) bool
 }
 
 type nodeKey struct{}
 
+// nodeMethods are what a region's keys may call whatever the node's state:
+// enrol, announce, self-test, read the rules. Everything else (registering a
+// session, which stamps it with the node) needs the node in rotation, so an
+// unapproved or non-compliant node serves nothing and stamps nothing.
+var nodeMethods = map[string]bool{
+	"/openpak.account.v1.Federation/Announce":        true,
+	"/openpak.account.v1.Federation/JoinServer":      true,
+	"/openpak.account.v1.Federation/StartSelfTest":   true,
+	"/openpak.account.v1.Federation/GetRequirements": true,
+}
+
 // Interceptor returns the server interceptor enforcing internal credentials.
 // The credential names a node ("home" for ACCOUNT_INTERNAL_KEY, a region
-// otherwise) and the node id travels in the context, so a handler that must
+// otherwise) and the caller travels in the context, so a handler that must
 // know who called reads it from there and never from the request.
 func Interceptor(auth NodeAuth) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
@@ -126,21 +139,33 @@ func Interceptor(auth NodeAuth) grpc.UnaryServerInterceptor {
 		if !ok || v == "" {
 			return nil, status.Error(codes.Unauthenticated, "missing or invalid internal credentials")
 		}
-		node, ok := auth.Authenticate(ctx, v)
+		caller, ok := auth.Authenticate(ctx, v)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "missing or invalid internal credentials")
 		}
-		return handler(context.WithValue(ctx, nodeKey{}, node), req)
+		if caller.Node != federation.Home && !nodeMethods[info.FullMethod] && !auth.Admitted(ctx, caller.Node) {
+			return nil, status.Error(codes.PermissionDenied, "node is not approved or not in rotation")
+		}
+		return handler(context.WithValue(ctx, nodeKey{}, caller), req)
 	}
 }
 
 // NodeFromContext is the node the interceptor authenticated; "home" when a
 // handler is called without one (direct calls in tests).
 func NodeFromContext(ctx context.Context) string {
-	if n, ok := ctx.Value(nodeKey{}).(string); ok && n != "" {
-		return n
+	if c, ok := ctx.Value(nodeKey{}).(federation.Caller); ok && c.Node != "" {
+		return c.Node
 	}
 	return federation.Home
+}
+
+// CallerFromContext is the full caller: node, and the server when a server key
+// was presented.
+func CallerFromContext(ctx context.Context) federation.Caller {
+	if c, ok := ctx.Value(nodeKey{}).(federation.Caller); ok && c.Node != "" {
+		return c
+	}
+	return federation.Caller{Node: federation.Home}
 }
 
 func credsFromContext(ctx context.Context) (string, bool) {

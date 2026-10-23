@@ -20,10 +20,20 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Federation_CreateNode_FullMethodName      = "/openpak.account.v1.Federation/CreateNode"
+	Federation_RotateNodeKey_FullMethodName   = "/openpak.account.v1.Federation/RotateNodeKey"
+	Federation_JoinServer_FullMethodName      = "/openpak.account.v1.Federation/JoinServer"
+	Federation_RevokeServer_FullMethodName    = "/openpak.account.v1.Federation/RevokeServer"
 	Federation_Announce_FullMethodName        = "/openpak.account.v1.Federation/Announce"
+	Federation_StartSelfTest_FullMethodName   = "/openpak.account.v1.Federation/StartSelfTest"
+	Federation_RecordSelfTest_FullMethodName  = "/openpak.account.v1.Federation/RecordSelfTest"
 	Federation_ListNodes_FullMethodName       = "/openpak.account.v1.Federation/ListNodes"
 	Federation_ListAllNodes_FullMethodName    = "/openpak.account.v1.Federation/ListAllNodes"
 	Federation_SetNodeApproved_FullMethodName = "/openpak.account.v1.Federation/SetNodeApproved"
+	Federation_SetNodeWaiver_FullMethodName   = "/openpak.account.v1.Federation/SetNodeWaiver"
+	Federation_GetRequirements_FullMethodName = "/openpak.account.v1.Federation/GetRequirements"
+	Federation_ListLocations_FullMethodName   = "/openpak.account.v1.Federation/ListLocations"
+	Federation_PutLocation_FullMethodName     = "/openpak.account.v1.Federation/PutLocation"
+	Federation_DeleteLocation_FullMethodName  = "/openpak.account.v1.Federation/DeleteLocation"
 )
 
 // FederationClient is the client API for Federation service.
@@ -34,19 +44,50 @@ const (
 // that announces its addresses; the matchmaking servers at home hand those
 // addresses out per room, so a joiner lands wherever the host's room lives.
 // Accounts, friends and matchmaking never leave home.
+//
+// A node is one region, one operator and one approval, running on one or
+// more servers. The node key only enrols servers; each server gets its own
+// key and announces on its own. A node is handed out ("in rotation") only
+// while it is approved and every one of its servers reports, and the node
+// meets the Requirements (see GetRequirements). Reports are self-declared:
+// they gate rotation and nothing else.
 type FederationClient interface {
-	// Called by the website on behalf of an operator. Returns the node's key
+	// Called by the website on behalf of an admin. Returns the node's key
 	// exactly once; the core keeps only its hash.
 	CreateNode(ctx context.Context, in *CreateNodeRequest, opts ...grpc.CallOption) (*CreateNodeResponse, error)
-	// Called by a node with its own key, about once a minute. Replaces the
-	// node's advertised services and marks it seen.
+	// Home only: replaces a node's enrolment key. Joined servers keep theirs.
+	RotateNodeKey(ctx context.Context, in *RotateNodeKeyRequest, opts ...grpc.CallOption) (*CreateNodeResponse, error)
+	// Called with a node key: enrols one server and returns its own key, once.
+	// Joining the same name again replaces that server's key.
+	JoinServer(ctx context.Context, in *JoinServerRequest, opts ...grpc.CallOption) (*JoinServerResponse, error)
+	// Home only: removes one server; its key stops working at once.
+	RevokeServer(ctx context.Context, in *RevokeServerRequest, opts ...grpc.CallOption) (*RevokeServerResponse, error)
+	// Called by a server with its own key, about once a minute. Replaces the
+	// server's advertised roles and hardware report and marks it seen.
 	Announce(ctx context.Context, in *AnnounceRequest, opts ...grpc.CallOption) (*AnnounceResponse, error)
-	// Approved nodes seen within the last few minutes. What the matchmaking
-	// servers and the status page pick from.
+	// Called with a server key: reserves one timed transfer for the bandwidth
+	// self-test. RESOURCE_EXHAUSTED inside the interval (one per direction per
+	// day by default).
+	StartSelfTest(ctx context.Context, in *StartSelfTestRequest, opts ...grpc.CallOption) (*StartSelfTestResponse, error)
+	// Home only: stores what home measured for a reserved transfer.
+	RecordSelfTest(ctx context.Context, in *RecordSelfTestRequest, opts ...grpc.CallOption) (*RecordSelfTestResponse, error)
+	// Nodes in rotation: approved, reporting and compliant. What the
+	// matchmaking servers and the status page pick from.
 	ListNodes(ctx context.Context, in *ListNodesRequest, opts ...grpc.CallOption) (*ListNodesResponse, error)
-	// Every node, approved or not, seen or not: the admin view.
+	// Every node, approved or not, with its servers and compliance: the admin view.
 	ListAllNodes(ctx context.Context, in *ListNodesRequest, opts ...grpc.CallOption) (*ListNodesResponse, error)
+	// Approving is refused (FAILED_PRECONDITION, naming every shortfall) while
+	// the node is below the minimum. Removing approval always works.
 	SetNodeApproved(ctx context.Context, in *SetNodeApprovedRequest, opts ...grpc.CallOption) (*SetNodeApprovedResponse, error)
+	// Home only: waives the hardware figures for one node (OpenPak's own test
+	// nodes). Approval, liveness, a fresh self-test and a public IPv4 still apply.
+	SetNodeWaiver(ctx context.Context, in *SetNodeWaiverRequest, opts ...grpc.CallOption) (*SetNodeWaiverResponse, error)
+	// The admission figures, from the core's configuration. Any caller.
+	GetRequirements(ctx context.Context, in *GetRequirementsRequest, opts ...grpc.CallOption) (*Requirements, error)
+	// The coverage plan: where OpenPak wants nodes.
+	ListLocations(ctx context.Context, in *ListLocationsRequest, opts ...grpc.CallOption) (*ListLocationsResponse, error)
+	PutLocation(ctx context.Context, in *Location, opts ...grpc.CallOption) (*PutLocationResponse, error)
+	DeleteLocation(ctx context.Context, in *DeleteLocationRequest, opts ...grpc.CallOption) (*DeleteLocationResponse, error)
 }
 
 type federationClient struct {
@@ -67,10 +108,60 @@ func (c *federationClient) CreateNode(ctx context.Context, in *CreateNodeRequest
 	return out, nil
 }
 
+func (c *federationClient) RotateNodeKey(ctx context.Context, in *RotateNodeKeyRequest, opts ...grpc.CallOption) (*CreateNodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateNodeResponse)
+	err := c.cc.Invoke(ctx, Federation_RotateNodeKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) JoinServer(ctx context.Context, in *JoinServerRequest, opts ...grpc.CallOption) (*JoinServerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinServerResponse)
+	err := c.cc.Invoke(ctx, Federation_JoinServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) RevokeServer(ctx context.Context, in *RevokeServerRequest, opts ...grpc.CallOption) (*RevokeServerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeServerResponse)
+	err := c.cc.Invoke(ctx, Federation_RevokeServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *federationClient) Announce(ctx context.Context, in *AnnounceRequest, opts ...grpc.CallOption) (*AnnounceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AnnounceResponse)
 	err := c.cc.Invoke(ctx, Federation_Announce_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) StartSelfTest(ctx context.Context, in *StartSelfTestRequest, opts ...grpc.CallOption) (*StartSelfTestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartSelfTestResponse)
+	err := c.cc.Invoke(ctx, Federation_StartSelfTest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) RecordSelfTest(ctx context.Context, in *RecordSelfTestRequest, opts ...grpc.CallOption) (*RecordSelfTestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordSelfTestResponse)
+	err := c.cc.Invoke(ctx, Federation_RecordSelfTest_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +198,56 @@ func (c *federationClient) SetNodeApproved(ctx context.Context, in *SetNodeAppro
 	return out, nil
 }
 
+func (c *federationClient) SetNodeWaiver(ctx context.Context, in *SetNodeWaiverRequest, opts ...grpc.CallOption) (*SetNodeWaiverResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetNodeWaiverResponse)
+	err := c.cc.Invoke(ctx, Federation_SetNodeWaiver_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) GetRequirements(ctx context.Context, in *GetRequirementsRequest, opts ...grpc.CallOption) (*Requirements, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Requirements)
+	err := c.cc.Invoke(ctx, Federation_GetRequirements_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) ListLocations(ctx context.Context, in *ListLocationsRequest, opts ...grpc.CallOption) (*ListLocationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListLocationsResponse)
+	err := c.cc.Invoke(ctx, Federation_ListLocations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) PutLocation(ctx context.Context, in *Location, opts ...grpc.CallOption) (*PutLocationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PutLocationResponse)
+	err := c.cc.Invoke(ctx, Federation_PutLocation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationClient) DeleteLocation(ctx context.Context, in *DeleteLocationRequest, opts ...grpc.CallOption) (*DeleteLocationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteLocationResponse)
+	err := c.cc.Invoke(ctx, Federation_DeleteLocation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FederationServer is the server API for Federation service.
 // All implementations must embed UnimplementedFederationServer
 // for forward compatibility.
@@ -115,19 +256,50 @@ func (c *federationClient) SetNodeApproved(ctx context.Context, in *SetNodeAppro
 // that announces its addresses; the matchmaking servers at home hand those
 // addresses out per room, so a joiner lands wherever the host's room lives.
 // Accounts, friends and matchmaking never leave home.
+//
+// A node is one region, one operator and one approval, running on one or
+// more servers. The node key only enrols servers; each server gets its own
+// key and announces on its own. A node is handed out ("in rotation") only
+// while it is approved and every one of its servers reports, and the node
+// meets the Requirements (see GetRequirements). Reports are self-declared:
+// they gate rotation and nothing else.
 type FederationServer interface {
-	// Called by the website on behalf of an operator. Returns the node's key
+	// Called by the website on behalf of an admin. Returns the node's key
 	// exactly once; the core keeps only its hash.
 	CreateNode(context.Context, *CreateNodeRequest) (*CreateNodeResponse, error)
-	// Called by a node with its own key, about once a minute. Replaces the
-	// node's advertised services and marks it seen.
+	// Home only: replaces a node's enrolment key. Joined servers keep theirs.
+	RotateNodeKey(context.Context, *RotateNodeKeyRequest) (*CreateNodeResponse, error)
+	// Called with a node key: enrols one server and returns its own key, once.
+	// Joining the same name again replaces that server's key.
+	JoinServer(context.Context, *JoinServerRequest) (*JoinServerResponse, error)
+	// Home only: removes one server; its key stops working at once.
+	RevokeServer(context.Context, *RevokeServerRequest) (*RevokeServerResponse, error)
+	// Called by a server with its own key, about once a minute. Replaces the
+	// server's advertised roles and hardware report and marks it seen.
 	Announce(context.Context, *AnnounceRequest) (*AnnounceResponse, error)
-	// Approved nodes seen within the last few minutes. What the matchmaking
-	// servers and the status page pick from.
+	// Called with a server key: reserves one timed transfer for the bandwidth
+	// self-test. RESOURCE_EXHAUSTED inside the interval (one per direction per
+	// day by default).
+	StartSelfTest(context.Context, *StartSelfTestRequest) (*StartSelfTestResponse, error)
+	// Home only: stores what home measured for a reserved transfer.
+	RecordSelfTest(context.Context, *RecordSelfTestRequest) (*RecordSelfTestResponse, error)
+	// Nodes in rotation: approved, reporting and compliant. What the
+	// matchmaking servers and the status page pick from.
 	ListNodes(context.Context, *ListNodesRequest) (*ListNodesResponse, error)
-	// Every node, approved or not, seen or not: the admin view.
+	// Every node, approved or not, with its servers and compliance: the admin view.
 	ListAllNodes(context.Context, *ListNodesRequest) (*ListNodesResponse, error)
+	// Approving is refused (FAILED_PRECONDITION, naming every shortfall) while
+	// the node is below the minimum. Removing approval always works.
 	SetNodeApproved(context.Context, *SetNodeApprovedRequest) (*SetNodeApprovedResponse, error)
+	// Home only: waives the hardware figures for one node (OpenPak's own test
+	// nodes). Approval, liveness, a fresh self-test and a public IPv4 still apply.
+	SetNodeWaiver(context.Context, *SetNodeWaiverRequest) (*SetNodeWaiverResponse, error)
+	// The admission figures, from the core's configuration. Any caller.
+	GetRequirements(context.Context, *GetRequirementsRequest) (*Requirements, error)
+	// The coverage plan: where OpenPak wants nodes.
+	ListLocations(context.Context, *ListLocationsRequest) (*ListLocationsResponse, error)
+	PutLocation(context.Context, *Location) (*PutLocationResponse, error)
+	DeleteLocation(context.Context, *DeleteLocationRequest) (*DeleteLocationResponse, error)
 	mustEmbedUnimplementedFederationServer()
 }
 
@@ -141,8 +313,23 @@ type UnimplementedFederationServer struct{}
 func (UnimplementedFederationServer) CreateNode(context.Context, *CreateNodeRequest) (*CreateNodeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateNode not implemented")
 }
+func (UnimplementedFederationServer) RotateNodeKey(context.Context, *RotateNodeKeyRequest) (*CreateNodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RotateNodeKey not implemented")
+}
+func (UnimplementedFederationServer) JoinServer(context.Context, *JoinServerRequest) (*JoinServerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method JoinServer not implemented")
+}
+func (UnimplementedFederationServer) RevokeServer(context.Context, *RevokeServerRequest) (*RevokeServerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeServer not implemented")
+}
 func (UnimplementedFederationServer) Announce(context.Context, *AnnounceRequest) (*AnnounceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Announce not implemented")
+}
+func (UnimplementedFederationServer) StartSelfTest(context.Context, *StartSelfTestRequest) (*StartSelfTestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartSelfTest not implemented")
+}
+func (UnimplementedFederationServer) RecordSelfTest(context.Context, *RecordSelfTestRequest) (*RecordSelfTestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordSelfTest not implemented")
 }
 func (UnimplementedFederationServer) ListNodes(context.Context, *ListNodesRequest) (*ListNodesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListNodes not implemented")
@@ -152,6 +339,21 @@ func (UnimplementedFederationServer) ListAllNodes(context.Context, *ListNodesReq
 }
 func (UnimplementedFederationServer) SetNodeApproved(context.Context, *SetNodeApprovedRequest) (*SetNodeApprovedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetNodeApproved not implemented")
+}
+func (UnimplementedFederationServer) SetNodeWaiver(context.Context, *SetNodeWaiverRequest) (*SetNodeWaiverResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetNodeWaiver not implemented")
+}
+func (UnimplementedFederationServer) GetRequirements(context.Context, *GetRequirementsRequest) (*Requirements, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRequirements not implemented")
+}
+func (UnimplementedFederationServer) ListLocations(context.Context, *ListLocationsRequest) (*ListLocationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListLocations not implemented")
+}
+func (UnimplementedFederationServer) PutLocation(context.Context, *Location) (*PutLocationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PutLocation not implemented")
+}
+func (UnimplementedFederationServer) DeleteLocation(context.Context, *DeleteLocationRequest) (*DeleteLocationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteLocation not implemented")
 }
 func (UnimplementedFederationServer) mustEmbedUnimplementedFederationServer() {}
 func (UnimplementedFederationServer) testEmbeddedByValue()                    {}
@@ -192,6 +394,60 @@ func _Federation_CreateNode_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Federation_RotateNodeKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateNodeKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).RotateNodeKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_RotateNodeKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).RotateNodeKey(ctx, req.(*RotateNodeKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_JoinServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).JoinServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_JoinServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).JoinServer(ctx, req.(*JoinServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_RevokeServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).RevokeServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_RevokeServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).RevokeServer(ctx, req.(*RevokeServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Federation_Announce_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AnnounceRequest)
 	if err := dec(in); err != nil {
@@ -206,6 +462,42 @@ func _Federation_Announce_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(FederationServer).Announce(ctx, req.(*AnnounceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_StartSelfTest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartSelfTestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).StartSelfTest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_StartSelfTest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).StartSelfTest(ctx, req.(*StartSelfTestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_RecordSelfTest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordSelfTestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).RecordSelfTest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_RecordSelfTest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).RecordSelfTest(ctx, req.(*RecordSelfTestRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -264,6 +556,96 @@ func _Federation_SetNodeApproved_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Federation_SetNodeWaiver_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetNodeWaiverRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).SetNodeWaiver(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_SetNodeWaiver_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).SetNodeWaiver(ctx, req.(*SetNodeWaiverRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_GetRequirements_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRequirementsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).GetRequirements(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_GetRequirements_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).GetRequirements(ctx, req.(*GetRequirementsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_ListLocations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListLocationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).ListLocations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_ListLocations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).ListLocations(ctx, req.(*ListLocationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_PutLocation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Location)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).PutLocation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_PutLocation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).PutLocation(ctx, req.(*Location))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Federation_DeleteLocation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteLocationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServer).DeleteLocation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Federation_DeleteLocation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServer).DeleteLocation(ctx, req.(*DeleteLocationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Federation_ServiceDesc is the grpc.ServiceDesc for Federation service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -276,8 +658,28 @@ var Federation_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Federation_CreateNode_Handler,
 		},
 		{
+			MethodName: "RotateNodeKey",
+			Handler:    _Federation_RotateNodeKey_Handler,
+		},
+		{
+			MethodName: "JoinServer",
+			Handler:    _Federation_JoinServer_Handler,
+		},
+		{
+			MethodName: "RevokeServer",
+			Handler:    _Federation_RevokeServer_Handler,
+		},
+		{
 			MethodName: "Announce",
 			Handler:    _Federation_Announce_Handler,
+		},
+		{
+			MethodName: "StartSelfTest",
+			Handler:    _Federation_StartSelfTest_Handler,
+		},
+		{
+			MethodName: "RecordSelfTest",
+			Handler:    _Federation_RecordSelfTest_Handler,
 		},
 		{
 			MethodName: "ListNodes",
@@ -290,6 +692,26 @@ var Federation_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetNodeApproved",
 			Handler:    _Federation_SetNodeApproved_Handler,
+		},
+		{
+			MethodName: "SetNodeWaiver",
+			Handler:    _Federation_SetNodeWaiver_Handler,
+		},
+		{
+			MethodName: "GetRequirements",
+			Handler:    _Federation_GetRequirements_Handler,
+		},
+		{
+			MethodName: "ListLocations",
+			Handler:    _Federation_ListLocations_Handler,
+		},
+		{
+			MethodName: "PutLocation",
+			Handler:    _Federation_PutLocation_Handler,
+		},
+		{
+			MethodName: "DeleteLocation",
+			Handler:    _Federation_DeleteLocation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

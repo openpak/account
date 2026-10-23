@@ -134,7 +134,11 @@ func run() error {
 	if len(internalKey) < 32 {
 		return errors.New("ACCOUNT_INTERNAL_KEY must be set (>=32 bytes); internal RPCs fail closed")
 	}
-	fedSvc := federation.New(pool, internalKey)
+	fedReq, err := federation.RequirementsFromEnv()
+	if err != nil {
+		return err
+	}
+	fedSvc := federation.New(pool, internalKey).WithRequirements(fedReq)
 	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(fedSvc)))
 	apiSrv := grpcapi.New(ident, lnks, evSvc, socSvc, sessSvc, invSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), SiteBaseURL: os.Getenv("ACCOUNT_EMAIL_LINK_BASE"), Federation: fedSvc, Moderation: moderation.New(pool), Media: media.New(pool)})
 	accountv1.RegisterIdentityServer(grpcSrv, apiSrv)

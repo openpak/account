@@ -125,11 +125,15 @@ func TestModerationHomeOnly(t *testing.T) {
 	mod := accountv1.NewModerationClient(lastConn)
 	fed := accountv1.NewFederationClient(lastConn)
 	home := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", grpcInternalKey)
-	node, err := fed.CreateNode(home, &accountv1.CreateNodeRequest{NodeId: "eu-test", Name: "EU test", Country: "DE"})
+	node, err := fed.CreateNode(home, &accountv1.CreateNodeRequest{NodeId: "eu-pending", Name: "EU pending", Country: "DE"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	region := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", node.GetKey())
+	pending := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", node.GetKey())
+	if _, err := mod.ListReports(pending, &accountv1.ListReportsRequest{}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("unapproved node: %v", err)
+	}
+	region := admittedNode(t, "eu-test")
 	if _, err := mod.SearchAccounts(region, &accountv1.SearchAccountsRequest{Query: "x"}); status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("region search: %v", err)
 	}

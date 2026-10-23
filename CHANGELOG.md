@@ -11,6 +11,23 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## Unreleased
+
+- **Federation admission rules** (migration 0025). A node is one region, operator and approval on
+  one or more servers. The node key only enrols servers (`JoinServer`); each server gets its own
+  `opsrv_` key, announces on its own with a hardware report (cores, RAM, disk, SSD, IPv4/IPv6,
+  port speed) and takes a daily home-measured bandwidth self-test (`StartSelfTest` /
+  `RecordSelfTest`). `SetNodeApproved` is refused (FAILED_PRECONDITION, naming each shortfall)
+  while the node is below the minimum; an approved node whose servers degrade or stop reporting
+  leaves `ListNodes` but keeps its approval. A region key that is not in rotation can only
+  announce, enrol and self-test: it cannot register (stamp) sessions or read anything. Figures are
+  `ACCOUNT_FEDERATION_*` (defaults 8 cores / 16 GB / 160 GB SSD per node, 2 cores / 4 GB / public
+  IPv4 / 1 Gbps per server, 99.5 % availability), readable through `GetRequirements`.
+- Per-node admin waiver of the hardware figures (`SetNodeWaiver`, reason required, optional expiry)
+  for OpenPak's own test nodes; everything else still applies.
+- Coverage plan: `federation_locations` (`ListLocations`, `PutLocation`, `DeleteLocation`), seeded
+  empty; a node's `region` is its location code, `country` is kept for routing.
+
 ## v0.16.0 — 2026-10-16
 
 - **Presence is pushed.** `presence_changed` (migration 0022): when a session begins, ends or lapses,

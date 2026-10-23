@@ -80,12 +80,17 @@ func TestAvatars(t *testing.T) {
 	}
 
 	// Region nodes read but never write.
+	// An unapproved node's key reads nothing.
 	fed := accountv1.NewFederationClient(lastConn)
-	node, err := fed.CreateNode(ctx, &accountv1.CreateNodeRequest{NodeId: "media-node", Name: "M", Country: "FR"})
+	node, err := fed.CreateNode(ctx, &accountv1.CreateNodeRequest{NodeId: "media-pending", Name: "P", Country: "FR"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	region := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", node.GetKey())
+	pending := metadata.AppendToOutgoingContext(context.Background(), "x-internal-key", node.GetKey())
+	if _, err := mc.GetAvatar(pending, &accountv1.GetAvatarRequest{AccountId: acct.ID}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("unapproved node read: %v", err)
+	}
+	region := admittedNode(t, "media-node")
 	if _, err := mc.GetAvatar(region, &accountv1.GetAvatarRequest{AccountId: acct.ID}); err != nil {
 		t.Fatalf("region read: %v", err)
 	}
