@@ -232,7 +232,7 @@ func (s *Service) ListFriends(ctx context.Context, accountID string) ([]Friend, 
 		))::bigint,0), extract(epoch FROM fr.since)::bigint FROM (
 		SELECT CASE WHEN requester_id=$1 THEN addressee_id ELSE requester_id END AS other, updated_at AS since
 		FROM friendships WHERE state='accepted' AND (requester_id=$1 OR addressee_id=$1)
-	) fr JOIN accounts acc ON acc.id = fr.other ORDER BY acc.display_name`, accountID)
+	) fr JOIN accounts acc ON acc.id = fr.other AND acc.status <> 'deleted' ORDER BY acc.display_name`, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (s *Service) ListFriends(ctx context.Context, accountID string) ([]Friend, 
 // ListIncomingRequests returns accounts with a pending request to accountID.
 func (s *Service) ListIncomingRequests(ctx context.Context, accountID string) ([]Friend, error) {
 	rows, err := s.pool.Query(ctx, `SELECT f.requester_id, acc.display_name
-		FROM friendships f JOIN accounts acc ON acc.id = f.requester_id
+		FROM friendships f JOIN accounts acc ON acc.id = f.requester_id AND acc.status <> 'deleted'
 		WHERE f.addressee_id=$1 AND f.state='pending' ORDER BY f.created_at`, accountID)
 	if err != nil {
 		return nil, err
@@ -480,7 +480,7 @@ func accountActive(ctx context.Context, q interface {
 // ListOutgoingRequests returns pending requests the account sent.
 func (s *Service) ListOutgoingRequests(ctx context.Context, accountID string) ([]Friend, error) {
 	rows, err := s.pool.Query(ctx, `SELECT f.addressee_id, acc.display_name
-		FROM friendships f JOIN accounts acc ON acc.id = f.addressee_id
+		FROM friendships f JOIN accounts acc ON acc.id = f.addressee_id AND acc.status <> 'deleted'
 		WHERE f.requester_id=$1 AND f.state='pending' ORDER BY f.created_at`, accountID)
 	if err != nil {
 		return nil, err
