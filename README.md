@@ -30,12 +30,12 @@ go run ./cmd/account
 
 - [Protocol](docs/protocol.md)
 - [Deploy](docs/deploy.md)
-- [Notes](docs/notes.md)
 - [Handles](docs/handles.md)
 - [Public codes](docs/public-codes.md)
 - [Routing](docs/routing.md)
 - [Two-factor](docs/two-factor.md)
-- [Docs index](docs/README.md)
+
+PRDs: openpak/prds (private)
 
 ## Licence
 

@@ -33,3 +33,13 @@ marked *home* also refuse region-node keys.
 | `POST /v1/verify/resend` | new verification link for the signed-in account, one per 10 minutes, one answer for every outcome |
 | `POST /v1/email/change`, `/v1/email/confirm` | link to the new address, notice to the old; applying it emits `email_changed` |
 | `POST /v1/2fa/setup`, `/enable`, `/disable`, `/v1/login/2fa`; `Identity.VerifySecondFactor` | TOTP + recovery codes. `VerifyPassword`/`VerifyPasswordByID` fail closed for 2FA accounts unless the caller sets `second_factor_supported`. See [two-factor.md](two-factor.md) |
+
+## Contracts
+
+The internal contracts live in `proto/openpak/account/v1` (Identity, Links, Social, Sessions, Invitations, Events, Registration, Federation, Moderation, Media); stubs are committed. Regenerate with:
+
+```sh
+protoc -I proto --go_out=. --go_opt=module=openpak/account --go-grpc_out=. --go-grpc_opt=module=openpak/account proto/openpak/account/v1/<file>.proto
+```
+
+The core never imports console protocol code (a guard test in `internal/architecture` enforces it); Wii U/3DS protocols live in `nn-account`. Link state machine: pending, active, revoking, revoked.
