@@ -11,8 +11,7 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
-## Unreleased
-
+## v0.17.0 — 2026-11-02
 - **Automatic account erasure** (migration 0027). Deleting closes the account at once and sets
   `erase_after` one grace period away (`ACCOUNT_DELETION_GRACE`, default 720h); the status it had
   is kept. Signing in with the right password answers 409 `deletion_pending` with the date, and
