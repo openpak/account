@@ -4,10 +4,8 @@
 
 Console-agnostic identity service: accounts, web sessions, email
 verification/recovery, generic adapter links, moderation foundation, and the
-canonical friend graph (in progress). Wii U/3DS protocols live in
+canonical friend graph. Wii U/3DS protocols live in
 [`nn-account`](https://github.com/openpak/nn-account); this core never imports Nintendo protocol code.
-
-Status: **M1 in progress** — see `PRD.md` in [`nn-account`](https://github.com/openpak/nn-account) for scope.
 
 ## Layout
 
