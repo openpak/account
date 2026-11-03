@@ -34,6 +34,9 @@ service Sessions {
   // was first and last played, newest first. What a console's friend page lists as "Play Activity"
   // (the console never publishes it; the server computes it). Finished sessions plus the live one.
   rpc GetPlayHistory(GetPlayHistoryRequest) returns (GetPlayHistoryResponse);
+  // The distinct UTC days (YYYY-MM-DD) on which an account had a finished session that started before a
+  // cutoff. Read-only; lets a service count play days from before it first saw the account.
+  rpc GetPlayDays(GetPlayDaysRequest) returns (GetPlayDaysResponse);
   // A game server (through nx-baas or nn-account, at the player's login) saying
   // these players reached it. Their live titled presence session in that
   // namespace counts playtime from the first such mark until it ends; a session
@@ -234,6 +237,15 @@ message GetPlayHistoryRequest {
   string account_id = 1;
   string namespace = 2;
   int32 limit = 3; // default and maximum 20: a console keeps no more
+}
+
+message GetPlayDaysRequest {
+  string account_id = 1;
+  int64 before_unix = 2; // sessions started before this instant; 0 means all
+}
+
+message GetPlayDaysResponse {
+  repeated string days = 1; // ascending, YYYY-MM-DD in UTC
 }
 
 message GetPlayHistoryResponse {

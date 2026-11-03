@@ -27,6 +27,7 @@ const (
 	Sessions_GetPlayerCounts_FullMethodName = "/openpak.account.v1.Sessions/GetPlayerCounts"
 	Sessions_GetPlaytime_FullMethodName     = "/openpak.account.v1.Sessions/GetPlaytime"
 	Sessions_GetPlayHistory_FullMethodName  = "/openpak.account.v1.Sessions/GetPlayHistory"
+	Sessions_GetPlayDays_FullMethodName     = "/openpak.account.v1.Sessions/GetPlayDays"
 	Sessions_MarkOnline_FullMethodName      = "/openpak.account.v1.Sessions/MarkOnline"
 )
 
@@ -64,6 +65,9 @@ type SessionsClient interface {
 	// was first and last played, newest first. What a console's friend page lists as "Play Activity"
 	// (the console never publishes it; the server computes it). Finished sessions plus the live one.
 	GetPlayHistory(ctx context.Context, in *GetPlayHistoryRequest, opts ...grpc.CallOption) (*GetPlayHistoryResponse, error)
+	// The distinct UTC days (YYYY-MM-DD) on which an account had a finished session that started before a
+	// cutoff. Read-only; lets a service count play days from before it first saw the account.
+	GetPlayDays(ctx context.Context, in *GetPlayDaysRequest, opts ...grpc.CallOption) (*GetPlayDaysResponse, error)
 	// A game server (through nx-baas or nn-account, at the player's login) saying
 	// these players reached it. Their live titled presence session in that
 	// namespace counts playtime from the first such mark until it ends; a session
@@ -160,6 +164,16 @@ func (c *sessionsClient) GetPlayHistory(ctx context.Context, in *GetPlayHistoryR
 	return out, nil
 }
 
+func (c *sessionsClient) GetPlayDays(ctx context.Context, in *GetPlayDaysRequest, opts ...grpc.CallOption) (*GetPlayDaysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPlayDaysResponse)
+	err := c.cc.Invoke(ctx, Sessions_GetPlayDays_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sessionsClient) MarkOnline(ctx context.Context, in *MarkOnlineRequest, opts ...grpc.CallOption) (*MarkOnlineResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MarkOnlineResponse)
@@ -204,6 +218,9 @@ type SessionsServer interface {
 	// was first and last played, newest first. What a console's friend page lists as "Play Activity"
 	// (the console never publishes it; the server computes it). Finished sessions plus the live one.
 	GetPlayHistory(context.Context, *GetPlayHistoryRequest) (*GetPlayHistoryResponse, error)
+	// The distinct UTC days (YYYY-MM-DD) on which an account had a finished session that started before a
+	// cutoff. Read-only; lets a service count play days from before it first saw the account.
+	GetPlayDays(context.Context, *GetPlayDaysRequest) (*GetPlayDaysResponse, error)
 	// A game server (through nx-baas or nn-account, at the player's login) saying
 	// these players reached it. Their live titled presence session in that
 	// namespace counts playtime from the first such mark until it ends; a session
@@ -243,6 +260,9 @@ func (UnimplementedSessionsServer) GetPlaytime(context.Context, *GetPlaytimeRequ
 }
 func (UnimplementedSessionsServer) GetPlayHistory(context.Context, *GetPlayHistoryRequest) (*GetPlayHistoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPlayHistory not implemented")
+}
+func (UnimplementedSessionsServer) GetPlayDays(context.Context, *GetPlayDaysRequest) (*GetPlayDaysResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPlayDays not implemented")
 }
 func (UnimplementedSessionsServer) MarkOnline(context.Context, *MarkOnlineRequest) (*MarkOnlineResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MarkOnline not implemented")
@@ -412,6 +432,24 @@ func _Sessions_GetPlayHistory_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sessions_GetPlayDays_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlayDaysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionsServer).GetPlayDays(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sessions_GetPlayDays_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionsServer).GetPlayDays(ctx, req.(*GetPlayDaysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Sessions_MarkOnline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(MarkOnlineRequest)
 	if err := dec(in); err != nil {
@@ -468,6 +506,10 @@ var Sessions_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPlayHistory",
 			Handler:    _Sessions_GetPlayHistory_Handler,
+		},
+		{
+			MethodName: "GetPlayDays",
+			Handler:    _Sessions_GetPlayDays_Handler,
 		},
 		{
 			MethodName: "MarkOnline",

@@ -5,6 +5,7 @@ package integration_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -68,5 +69,37 @@ func TestPlayHistory(t *testing.T) {
 	}
 	if none, err := sc.GetPlayHistory(ctx, &accountv1.GetPlayHistoryRequest{AccountId: "00000000-0000-4000-8000-000000000000", Namespace: "switch"}); err != nil || len(none.GetEntries()) != 0 {
 		t.Fatalf("unknown account is an empty history: %v %v", none, err)
+	}
+}
+
+// GetPlayDays lists each UTC day with a finished session once, ascending, before the cutoff.
+func TestPlayDays(t *testing.T) {
+	_, _, _, sc, _, _, ident := startGRPC(t)
+	ctx := authCtx()
+	pool, err := storage.Connect(context.Background(), testDBURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	a, _, err := ident.Register(ctx, "days@example.com", "correct horse battery", "Player")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, st := range []string{"2026-09-26 10:00+00", "2026-09-26 23:30+00", "2026-10-02 00:10+00", "2026-10-30 12:00+00"} {
+		if _, err := pool.Exec(context.Background(), `INSERT INTO play_sessions (account_id, namespace, title_id, client, os, started_at, ended_at)
+			VALUES ($1, 'switch', 't', 'harbor', 'linux', $2::timestamptz, $2::timestamptz + interval '1 hour')`, a.ID, st); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r, err := sc.GetPlayDays(ctx, &accountv1.GetPlayDaysRequest{AccountId: a.ID})
+	if err != nil || len(r.GetDays()) != 3 || r.GetDays()[0] != "2026-09-26" || r.GetDays()[2] != "2026-10-30" {
+		t.Fatalf("days: %v %v", r, err)
+	}
+	cut := time.Date(2026, 10, 10, 0, 0, 0, 0, time.UTC).Unix()
+	if r, err := sc.GetPlayDays(ctx, &accountv1.GetPlayDaysRequest{AccountId: a.ID, BeforeUnix: cut}); err != nil || len(r.GetDays()) != 2 {
+		t.Fatalf("cutoff: %v %v", r, err)
+	}
+	if _, err := sc.GetPlayDays(ctx, &accountv1.GetPlayDaysRequest{AccountId: "nope"}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("bad id: %v", err)
 	}
 }

@@ -256,6 +256,22 @@ func (s *Server) GetPlayHistory(ctx context.Context, req *accountv1.GetPlayHisto
 	return resp, nil
 }
 
+// GetPlayDays lists the distinct UTC days an account played before a cutoff; see sessions.PlayDays.
+func (s *Server) GetPlayDays(ctx context.Context, req *accountv1.GetPlayDaysRequest) (*accountv1.GetPlayDaysResponse, error) {
+	if err := s.authorize(ctx); err != nil {
+		return nil, err
+	}
+	var before time.Time
+	if req.GetBeforeUnix() > 0 {
+		before = time.Unix(req.GetBeforeUnix(), 0)
+	}
+	days, err := s.sessions.PlayDays(ctx, req.GetAccountId(), before)
+	if err != nil {
+		return nil, mapSessionErr(err)
+	}
+	return &accountv1.GetPlayDaysResponse{Days: days}, nil
+}
+
 // MarkOnline is a game server confirming who is connected to it; see sessions.MarkOnline.
 func (s *Server) MarkOnline(ctx context.Context, req *accountv1.MarkOnlineRequest) (*accountv1.MarkOnlineResponse, error) {
 	if err := s.authorize(ctx); err != nil {

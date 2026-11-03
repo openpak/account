@@ -468,6 +468,36 @@ func (s *Service) PlayHistory(ctx context.Context, accountID, namespace string, 
 	return out, rows.Err()
 }
 
+// PlayDays lists the distinct UTC days (YYYY-MM-DD, ascending) on which the account had a finished
+// session that started before the cutoff; a zero cutoff means no limit.
+func (s *Service) PlayDays(ctx context.Context, accountID string, before time.Time) ([]string, error) {
+	if !uuidRe.MatchString(accountID) {
+		return nil, ErrInvalid
+	}
+	rows, err := s.pool.Query(ctx, `SELECT DISTINCT to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS d FROM play_sessions
+		WHERE account_id = $1::uuid AND title_id <> '' AND ($2::timestamptz IS NULL OR started_at < $2) ORDER BY d`, accountID, nullTime(before))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var d string
+		if err := rows.Scan(&d); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+func nullTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+
 // OnlinePlayer is one player a game server just let in.
 type OnlinePlayer struct{ AccountID, Namespace, TitleID string }
 
