@@ -38,3 +38,21 @@ func TestUnaryLogsCodeNoPayload(t *testing.T) {
 		t.Error("health logged")
 	}
 }
+
+func TestPollIsCountedNotLogged(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(old)
+	before := pollCount.Load()
+	ok := func(context.Context, any) (any, error) { return nil, nil }
+	_, _ = Unary(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: "/a.Events/PollEvents"}, ok)
+	if buf.Len() != 0 || pollCount.Load() != before+1 {
+		t.Fatalf("poll logged or not counted: %q", buf.String())
+	}
+	_, _ = Unary(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: "/a.Events/PollEvents"},
+		func(context.Context, any) (any, error) { return nil, status.Error(codes.Internal, "x") })
+	if !strings.Contains(buf.String(), "code=Internal") {
+		t.Fatalf("failing poll not logged: %q", buf.String())
+	}
+}
