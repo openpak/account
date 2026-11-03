@@ -11,6 +11,9 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.19.0 — 2026-11-03
+- Per-request logging: one slog line per HTTP request (method, path, status, ms) and per gRPC unary call (method, code, ms) on stderr via internal/httplog and internal/grpclog. Query strings, headers and bodies are never logged; /healthz and /metrics are skipped.
+
 ## v0.18.0 — 2026-11-03
 - `Sessions.GetPlayDays` (read-only): the distinct UTC days on which an account had a finished play session that
   started before a cutoff. Rewards uses it to count play days from before it first saw an account.

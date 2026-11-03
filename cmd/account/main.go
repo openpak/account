@@ -21,6 +21,8 @@ import (
 	"openpak/account/internal/events"
 	"openpak/account/internal/federation"
 	"openpak/account/internal/grpcapi"
+	"openpak/account/internal/grpclog"
+	"openpak/account/internal/httplog"
 	"openpak/account/internal/identity"
 	"openpak/account/internal/invitations"
 	"openpak/account/internal/links"
@@ -144,7 +146,7 @@ func run() error {
 		return err
 	}
 	fedSvc := federation.New(pool, internalKey).WithRequirements(fedReq)
-	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Interceptor(fedSvc)))
+	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpclog.Unary, grpcapi.Interceptor(fedSvc)))
 	apiSrv := grpcapi.New(ident, lnks, evSvc, socSvc, sessSvc, invSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), SiteBaseURL: os.Getenv("ACCOUNT_EMAIL_LINK_BASE"), Federation: fedSvc, Moderation: moderation.New(pool), Media: media.New(pool)})
 	accountv1.RegisterIdentityServer(grpcSrv, apiSrv)
 	accountv1.RegisterLinksServer(grpcSrv, apiSrv)
@@ -175,7 +177,7 @@ func run() error {
 	httpMux.Handle("/", web.New(ident, m, os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), os.Getenv("ACCOUNT_EMAIL_LINK_BASE")))
 	httpSrv := &http.Server{
 		Addr:              cfg.HTTPListenAddr,
-		Handler:           httpMux,
+		Handler:           httplog.Middleware(httpMux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
