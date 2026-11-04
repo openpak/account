@@ -28,6 +28,7 @@ marked *home* also refuse region-node keys.
 | `Moderation.SearchAccounts`, `SetAccountBanned` (CR-5, *home*) | search by id, email, display name or link subject; bans revoke sessions, emit `account_banned`/`account_unbanned`, and record reason + actor in `moderation_actions` |
 | `Moderation.FileReport`, `ListReports`, `ResolveReport` (CR-6) | the reports queue; listing and resolving are *home* |
 | `Links.SetLinkPublicCode`, `ListAccountLinks`, `GetLinkByPublicCode` (CR-3) | the adapter publishes the code it mints (the Switch friend code); `public_code` also rides on `GetActiveLinkByAccount`. See [public-codes.md](public-codes.md) |
+| `Mii.PutMii` (*home*), `GetMii`, `DeleteMii` (*home*) | the primary Mii, one row per account: Ver3 canonical plus cached Wii RFL and Switch CharInfo; PutMii takes any of the three formats, GetMii returns any; conditional fetch by version; removed at erasure |
 | `Media.PutAvatar` (*home*), `GetAvatar`, `DeleteAvatar` (*home*) (CR-2) | 256 and 512 px PNGs in Postgres (≤256 KiB / ≤1 MiB), one row per account, conditional fetch by version |
 | `Social.ListBlocks` | the blocker's own list |
 | `POST /v1/verify/resend` | new verification link for the signed-in account, one per 10 minutes, one answer for every outcome |
@@ -36,7 +37,7 @@ marked *home* also refuse region-node keys.
 
 ## Contracts
 
-The internal contracts live in `proto/openpak/account/v1` (Identity, Links, Social, Sessions, Invitations, Events, Registration, Federation, Moderation, Media); stubs are committed. Regenerate with:
+The internal contracts live in `proto/openpak/account/v1` (Identity, Links, Social, Sessions, Invitations, Events, Registration, Federation, Moderation, Media, Mii); stubs are committed. Regenerate with:
 
 ```sh
 protoc -I proto --go_out=. --go_opt=module=openpak/account --go-grpc_out=. --go-grpc_opt=module=openpak/account proto/openpak/account/v1/<file>.proto

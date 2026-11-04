@@ -28,6 +28,7 @@ import (
 	"openpak/account/internal/links"
 	"openpak/account/internal/mailer"
 	"openpak/account/internal/media"
+	"openpak/account/internal/mii"
 	"openpak/account/internal/moderation"
 	"openpak/account/internal/sessions"
 	"openpak/account/internal/social"
@@ -147,7 +148,7 @@ func run() error {
 	}
 	fedSvc := federation.New(pool, internalKey).WithRequirements(fedReq)
 	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpclog.Unary, grpcapi.Interceptor(fedSvc)))
-	apiSrv := grpcapi.New(ident, lnks, evSvc, socSvc, sessSvc, invSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), SiteBaseURL: os.Getenv("ACCOUNT_EMAIL_LINK_BASE"), Federation: fedSvc, Moderation: moderation.New(pool), Media: media.New(pool)})
+	apiSrv := grpcapi.New(ident, lnks, evSvc, socSvc, sessSvc, invSvc, grpcapi.Options{Mailer: m, BaseURL: os.Getenv("ACCOUNT_PUBLIC_BASE_URL"), SiteBaseURL: os.Getenv("ACCOUNT_EMAIL_LINK_BASE"), Federation: fedSvc, Moderation: moderation.New(pool), Media: media.New(pool), Mii: mii.New(pool)})
 	accountv1.RegisterIdentityServer(grpcSrv, apiSrv)
 	accountv1.RegisterLinksServer(grpcSrv, apiSrv)
 	accountv1.RegisterEventsServer(grpcSrv, apiSrv)
@@ -158,6 +159,7 @@ func run() error {
 	accountv1.RegisterFederationServer(grpcSrv, apiSrv)
 	accountv1.RegisterModerationServer(grpcSrv, apiSrv)
 	accountv1.RegisterMediaServer(grpcSrv, apiSrv)
+	accountv1.RegisterMiiServer(grpcSrv, apiSrv)
 	healthSrv := health.NewServer()
 	healthSrv.SetServingStatus("account", healthv1.HealthCheckResponse_SERVING)
 	healthv1.RegisterHealthServer(grpcSrv, healthSrv)

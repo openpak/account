@@ -43,6 +43,7 @@ func TestFinalizeDeletionDestroysCredentials(t *testing.T) {
 		`INSERT INTO two_factor_recovery_codes (account_id, code_hash) VALUES ('` + acct.ID + `', '\x01')`,
 		`INSERT INTO login_challenges (id, account_id, token_hash, expires_at) VALUES ('22222222-2222-2222-2222-222222222222', '` + acct.ID + `', '\x02', now() + interval '10 minutes')`,
 		`INSERT INTO account_avatars (account_id, png_256, png_512, version) VALUES ('` + acct.ID + `', '\x03', '\x04', 1)`,
+		`INSERT INTO account_miis (account_id, ver3, rfl, char_info, name, version, source) VALUES ('` + acct.ID + `', decode(repeat('00',96),'hex'), decode(repeat('00',76),'hex'), decode(repeat('00',88),'hex'), 'x', 'v', 'ver3')`,
 		`INSERT INTO adapter_sessions (session_id, account_id, namespace, title_id, endpoint_ref, expires_at) VALUES ('33333333-3333-3333-3333-333333333333', '` + acct.ID + `', 'switch', '0100aaaa', 'ref', now() + interval '1 hour')`,
 		`INSERT INTO play_sessions (account_id, namespace, title_id, client, os, started_at, ended_at) VALUES ('` + acct.ID + `', 'switch', '0100aaaa', 'c', '', now(), now())`,
 	} {
@@ -74,7 +75,7 @@ func TestFinalizeDeletionDestroysCredentials(t *testing.T) {
 	}
 
 	for _, table := range []string{"sessions", "lifecycle_tokens", "adapter_credentials", "adapter_sessions",
-		"play_sessions", "account_two_factor", "two_factor_recovery_codes", "login_challenges", "account_avatars"} {
+		"play_sessions", "account_two_factor", "two_factor_recovery_codes", "login_challenges", "account_avatars", "account_miis"} {
 		var n int
 		if err := pool.QueryRow(ctx, `SELECT count(*) FROM `+table+` WHERE account_id=$1`, acct.ID).Scan(&n); err != nil {
 			t.Fatalf("count %s: %v", table, err)

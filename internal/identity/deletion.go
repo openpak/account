@@ -115,7 +115,7 @@ func (s *Service) RestoreByPassword(ctx context.Context, email, password string)
 // finaliser once the grace period is over (or by the home operator). It
 // destroys core credentials, erases everything the core holds about the
 // account, and starts the database-enforced 90-day handle hold. Swept: sessions
-// and credentials, two-factor material, avatar, console links and adapter
+// and credentials, two-factor material, avatar, Mii, console links and adapter
 // routing, presence and play history, friendships both ways, blocks both ways,
 // game invitations both ways. Moderation actions and reports stay: they are
 // the audit trail, and after this they name an anonymized ID only (display
@@ -150,6 +150,7 @@ func (s *Service) FinalizeDeletion(ctx context.Context, accountID string) error 
 			`DELETE FROM two_factor_recovery_codes WHERE account_id=$1`,
 			`DELETE FROM login_challenges WHERE account_id=$1`,
 			`DELETE FROM account_avatars WHERE account_id=$1`,
+			`DELETE FROM account_miis WHERE account_id=$1`,
 			`DELETE FROM friendships WHERE requester_id=$1 OR addressee_id=$1`,
 			`DELETE FROM account_blocks WHERE blocker_id=$1 OR blocked_id=$1`,
 			`DELETE FROM invitations WHERE from_id=$1 OR to_id=$1`,

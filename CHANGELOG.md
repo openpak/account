@@ -11,6 +11,15 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.20.0 — 2026-11-04
+- The account's primary Mii (card #123). New `Mii` gRPC service (`PutMii` home-only, `GetMii`, `DeleteMii` home-only) and
+  table `account_miis` (migration 0029). One Mii per account, stored once as Ver3 (96-byte Wii U / 3DS store data) with
+  its Wii RFL (76 bytes) and Switch CharInfo (88 bytes) encodings cached beside it, so every console reads its own
+  form and nothing converts at the edge. Converters are pure functions in `internal/mii` (round-trip tests; Wii
+  to Ver3 follows the FFL decompilation's official conversion, CharInfo colours follow Eden's tables; fields without a
+  counterpart map to the nearest valid value, documented in code). Writing identical data, or a console echoing back
+  the bytes it was given, is a no-op. Erasure (`FinalizeDeletion`) deletes the Mii; the deletion test covers it.
+
 ## v0.19.2 — 2026-11-04
 - Event stream admits `leaderboard.record` and `achievement.unlocked` (migration 0028; closed set in `events.KnownTypes`).
   The core leaderboards and achievements services announce new bests and unlocks with them (account = player,

@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package openpak.account.v1;
+
+option go_package = "openpak/account/proto/openpak/account/v1;accountv1";
+
+// The account's primary Mii. One Mii per account, shared by every console
+// network: the Wii, Wii U / 3DS and Switch adapters all read and write the
+// same one. The core keeps it in Ver3 and converts, so an adapter asks for the
+// form its console speaks and never converts anything itself. PutMii and
+// DeleteMii are home-only; GetMii is open to every authenticated caller.
+service Mii {
+  // Replace the account's Mii. data is in the stated format; it is range-checked
+  // (and its CRC checked for RFL) and stored as Ver3 together with its cached
+  // RFL and CharInfo encodings. Writing identical data is a no-op (changed =
+  // false). InvalidArgument for unreadable data, NotFound for unknown or
+  // deleted accounts.
+  rpc PutMii(PutMiiRequest) returns (PutMiiResponse);
+  // The Mii in one format. NotFound when the account has none. With
+  // if_none_match equal to the current version the response has
+  // not_modified = true and no data.
+  rpc GetMii(GetMiiRequest) returns (GetMiiResponse);
+  // Remove the Mii. Idempotent. Account erasure removes it too.
+  rpc DeleteMii(DeleteMiiRequest) returns (DeleteMiiResponse);
+}
+
+enum MiiFormat {
+  MII_FORMAT_UNSPECIFIED = 0;
+  // 96 bytes: Wii U / 3DS store data, CRC16 at 0x5E (the canonical form).
+  MII_FORMAT_VER3 = 1;
+  // 76 bytes: Wii RFLiStoreData (74 bytes of character data plus CRC16).
+  MII_FORMAT_RFL = 2;
+  // 88 bytes: Switch nn::mii::CharInfo.
+  MII_FORMAT_CHAR_INFO = 3;
+}
+
+message PutMiiRequest {
+  string account_id = 1;
+  MiiFormat format = 2;
+  bytes data = 3;
+}
+
+message PutMiiResponse {
+  string version = 1; // content hash of the stored Ver3 data
+  bool changed = 2;
+}
+
+message GetMiiRequest {
+  string account_id = 1;
+  MiiFormat format = 2;
+  string if_none_match = 3; // a version the caller already holds
+}
+
+message GetMiiResponse {
+  bytes data = 1; // empty when not_modified
+  string version = 2;
+  string name = 3;
+  int64 updated_at_unix = 4;
+  bool not_modified = 5;
+}
+
+message DeleteMiiRequest { string account_id = 1; }
+
+message DeleteMiiResponse {}

@@ -15,7 +15,7 @@ OpenPak's Account Server.
 
 | Endpoint | What |
 | --- | --- |
-| gRPC (internal) | Identity, Links, Social, Sessions, Invitations, Events, Registration, Federation, Moderation and Media contracts, internal-key authenticated |
+| gRPC (internal) | Identity, Links, Social, Sessions, Invitations, Events, Registration, Federation, Moderation, Media and Mii contracts, internal-key authenticated |
 | HTTP | JSON web and API routes: register, verify, login, sessions, recovery, whoami, email change, 2FA |
 
 ## Run

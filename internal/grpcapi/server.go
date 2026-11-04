@@ -20,6 +20,7 @@ import (
 	"openpak/account/internal/links"
 	"openpak/account/internal/mailer"
 	"openpak/account/internal/media"
+	"openpak/account/internal/mii"
 	"openpak/account/internal/moderation"
 	"openpak/account/internal/sessions"
 	"openpak/account/internal/social"
@@ -37,6 +38,7 @@ type Server struct {
 	accountv1.UnimplementedFederationServer
 	accountv1.UnimplementedModerationServer
 	accountv1.UnimplementedMediaServer
+	accountv1.UnimplementedMiiServer
 	identity    *identity.Service
 	federation  *federation.Service
 	links       *links.Service
@@ -46,6 +48,7 @@ type Server struct {
 	invitations *invitations.Service
 	moderation  *moderation.Service
 	media       *media.Service
+	mii         *mii.Service
 	mailer      *mailer.Mailer
 	baseURL     string
 	siteBaseURL string
@@ -64,13 +67,15 @@ type Options struct {
 	Moderation *moderation.Service
 	// Media stores avatars. Nil answers Unimplemented on the Media service.
 	Media *media.Service
+	// Mii stores the primary Mii. Nil answers Unimplemented on the Mii service.
+	Mii *mii.Service
 }
 
 func New(ident *identity.Service, lnks *links.Service, evs *events.Service, soc *social.Service, sess *sessions.Service, inv *invitations.Service, opts Options) *Server {
 	if opts.BaseURL == "" {
 		opts.BaseURL = "http://localhost:8000"
 	}
-	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL, siteBaseURL: opts.SiteBaseURL, federation: opts.Federation, moderation: opts.Moderation, media: opts.Media}
+	return &Server{identity: ident, links: lnks, events: evs, social: soc, sessions: sess, invitations: inv, mailer: opts.Mailer, baseURL: opts.BaseURL, siteBaseURL: opts.SiteBaseURL, federation: opts.Federation, moderation: opts.Moderation, media: opts.Media, mii: opts.Mii}
 }
 
 func (s *Server) PollEvents(ctx context.Context, req *accountv1.PollEventsRequest) (*accountv1.PollEventsResponse, error) {
