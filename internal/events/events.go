@@ -37,6 +37,8 @@ var KnownTypes = map[string]bool{
 	"message":                true,
 	"email_changed":          true,
 	"presence_changed":       true,
+	"leaderboard.record":     true,
+	"achievement.unlocked":   true,
 }
 
 type Service struct {

@@ -169,6 +169,12 @@ func TestEmitEventRejectsUnknownType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, typ := range []string{"leaderboard.record", "achievement.unlocked"} {
+		e, err := evSvc.EmitEvent(ctx, typ, "00000000-0000-0000-0000-000000000003", "", "title/board")
+		if err != nil || e.GetType() != typ || e.GetVersion() == 0 {
+			t.Fatalf("%s must be admitted: %+v %v", typ, e, err)
+		}
+	}
 	if ev.GetType() != "message" || ev.GetVersion() == 0 || ev.GetEventId() == "" {
 		t.Fatalf("emitted event: %+v", ev)
 	}

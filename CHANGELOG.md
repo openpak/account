@@ -11,6 +11,11 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.19.2 — 2026-11-04
+- Event stream admits `leaderboard.record` and `achievement.unlocked` (migration 0028; closed set in `events.KnownTypes`).
+  The core leaderboards and achievements services announce new bests and unlocks with them (account = player,
+  subject = `<title>/<board>` or `<title>/<achievement>`). Test: `TestEmitEventRejectsUnknownType` now also emits both.
+
 ## v0.19.1 — 2026-11-03
 - PollEvents gRPC calls are counted and summarised once a minute instead of logged per call (a failing poll still logs).
 
