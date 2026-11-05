@@ -11,6 +11,10 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.23.0 — 2026-11-05
+
+- `GetPlayHistory` with `limit = -1` returns every title instead of the newest 20 (card #131 phase 9: rewards derives playtime from the whole history). Default and 0..N behaviour unchanged. Wire format unchanged.
+
 ## v0.22.0 — 2026-11-05
 
 - Password pepper rotation without a password reset. `ACCOUNT_SESSION_SECRET_NEW` (optional, at least 32 bytes) becomes the current pepper; `ACCOUNT_SESSION_SECRET` stays as the verify-only fallback. Migration 0031 adds `pepper_gen` (0 = `ACCOUNT_SESSION_SECRET`, 1 = `_NEW`) to `accounts` and `adapter_credentials`; every password and adapter-credential check (`VerifyCredentials`, `VerifyByID`, `VerifyAdapterCredential`, resend-verification) reads the hash under the pepper its generation names, and a successful check on an old-pepper hash stores a new hash under the current pepper (compare-and-swap, own transaction). Registration, reset, change and `SetAdapterCredential` write under the current pepper. Session, lifecycle, email-change, login-challenge and recovery-code tokens are looked up under both peppers and stored under the current one. A startup log line counts accounts and adapter credentials per generation (the cutover measure). Unset `_NEW` behaves as before

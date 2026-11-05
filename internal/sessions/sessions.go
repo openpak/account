@@ -433,6 +433,9 @@ type PlayHistoryEntry struct {
 // MaxPlayHistory is how many titles a console's friend page keeps.
 const MaxPlayHistory = 20
 
+// AllPlayHistory as the limit asks for every title, not just the newest MaxPlayHistory.
+const AllPlayHistory = -1
+
 // PlayHistory is what an account played in a namespace, newest title first: every finished session
 // (play_sessions) and the one still running (adapter_sessions), per title. Unlike Playtime it counts a
 // session whether or not it reached a game server, since a play log is about the title having run.
@@ -440,8 +443,14 @@ func (s *Service) PlayHistory(ctx context.Context, accountID, namespace string, 
 	if !uuidRe.MatchString(accountID) || namespace == "" {
 		return nil, ErrInvalid
 	}
-	if limit <= 0 || limit > MaxPlayHistory {
-		limit = MaxPlayHistory
+	// limit < 0 means every title (AllPlayHistory): the rewards service derives its playtime from the whole history.
+	var lim *int
+	if limit >= 0 {
+		l := limit
+		if l == 0 || l > MaxPlayHistory {
+			l = MaxPlayHistory
+		}
+		lim = &l
 	}
 	rows, err := s.pool.Query(ctx, `WITH d AS (
 			SELECT title_id, started_at, ended_at FROM play_sessions
@@ -452,7 +461,7 @@ func (s *Service) PlayHistory(ctx context.Context, accountID, namespace string, 
 		SELECT title_id, count(*)::int,
 			GREATEST(0, sum(extract(epoch FROM ended_at - started_at)))::bigint,
 			extract(epoch FROM min(started_at))::bigint, extract(epoch FROM max(ended_at))::bigint
-		FROM d GROUP BY title_id ORDER BY max(ended_at) DESC LIMIT $3`, accountID, namespace, limit)
+		FROM d GROUP BY title_id ORDER BY max(ended_at) DESC LIMIT $3`, accountID, namespace, lim)
 	if err != nil {
 		return nil, err
 	}

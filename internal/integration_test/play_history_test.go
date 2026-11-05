@@ -48,6 +48,9 @@ func TestPlayHistory(t *testing.T) {
 	if err != nil || len(r.GetEntries()) != 2 {
 		t.Fatalf("history: %v %v", r, err)
 	}
+	if all, err := sc.GetPlayHistory(ctx, &accountv1.GetPlayHistoryRequest{AccountId: a.ID, Namespace: "switch", Limit: -1}); err != nil || len(all.GetEntries()) != 2 {
+		t.Fatalf("limit -1 (all titles): %v %v", all, err)
+	}
 	first, second := r.GetEntries()[0], r.GetEntries()[1]
 	if first.GetTitleId() != newer || second.GetTitleId() != older {
 		t.Fatalf("order: %s then %s, want the most recently played first", first.GetTitleId(), second.GetTitleId())

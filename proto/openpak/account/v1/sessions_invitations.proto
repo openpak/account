@@ -236,7 +236,7 @@ message PlaytimeTally {
 message GetPlayHistoryRequest {
   string account_id = 1;
   string namespace = 2;
-  int32 limit = 3; // default and maximum 20: a console keeps no more
+  int32 limit = 3; // default and maximum 20: a console keeps no more; -1 = every title (service callers)
 }
 
 message GetPlayDaysRequest {
