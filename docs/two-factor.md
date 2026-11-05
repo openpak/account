@@ -66,6 +66,8 @@ associated data, so a ciphertext copied onto another row does not decrypt.
 The key is SHA-256 of `ACCOUNT_TOTP_KEY` (at least 32 bytes). If that is
 unset, the key is derived from `ACCOUNT_SESSION_SECRET`, which is already a
 secret the core cannot rotate without invalidating every password. Changing
-the key makes every enrolled second factor unreadable, and affected users then
-sign in with a recovery code. Recovery codes are stored as peppered SHA-256
+the key with the service alone makes every enrolled second factor unreadable. To change it
+safely, stop the service and run `totp-rekey` (see its header: `ACCOUNT_TOTP_KEY_OLD`, then
+`-apply`), then start the service on the new key. `ACCOUNT_SESSION_SECRET` is also the password
+pepper: it is not rotated this way and must not change. Recovery codes are stored as peppered SHA-256
 hashes, like every other token.

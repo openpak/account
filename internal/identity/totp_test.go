@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"time"
@@ -83,5 +84,38 @@ func TestOtpauthURIAndRecoveryCodes(t *testing.T) {
 		if normalizeRecoveryCode(" "+strings.ToUpper(c)+" ") != strings.ReplaceAll(c, "-", "") {
 			t.Fatalf("normalize %q", c)
 		}
+	}
+}
+
+func TestResealTOTP(t *testing.T) {
+	news := newSealer(strings.Repeat("n", 32))
+	oldA := newSealer(strings.Repeat("a", 32))
+	oldB := newSealer(strings.Repeat("b", 32))
+	other := newSealer(strings.Repeat("x", 32))
+	secret := []byte("12345678901234567890")
+
+	sealedB, _ := oldB.seal(secret, "acct-1")
+	out, from, err := resealTOTP(news, []*sealer{oldA, oldB}, "acct-1", sealedB)
+	if err != nil || from != 1 {
+		t.Fatalf("from=%d err=%v", from, err)
+	}
+	if got, err := news.open(out, "acct-1"); err != nil || !bytes.Equal(got, secret) {
+		t.Fatalf("not readable under the new key: %v", err)
+	}
+	if _, err := oldB.open(out, "acct-1"); err == nil {
+		t.Fatal("still readable under the old key")
+	}
+	// already on the new key: untouched
+	again, from, err := resealTOTP(news, []*sealer{oldA, oldB}, "acct-1", out)
+	if err != nil || from != -1 || !bytes.Equal(again, out) {
+		t.Fatalf("second pass from=%d err=%v", from, err)
+	}
+	// a secret under an unknown key, or copied onto another account's row, is refused
+	sealedX, _ := other.seal(secret, "acct-1")
+	if _, _, err := resealTOTP(news, []*sealer{oldA, oldB}, "acct-1", sealedX); err == nil {
+		t.Fatal("an unknown key must be refused")
+	}
+	if _, _, err := resealTOTP(news, []*sealer{oldA, oldB}, "acct-2", sealedB); err == nil {
+		t.Fatal("a ciphertext moved to another account must be refused")
 	}
 }

@@ -11,6 +11,10 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.21.1 — 2026-11-05
+
+- `totp-rekey` (in the image next to `handle-migrate`): moves the sealed two-factor secrets to a new `ACCOUNT_TOTP_KEY` in one transaction, accepting the previous key and the session pepper as the keys rows may be under now (`ACCOUNT_TOTP_KEY_OLD`, comma separated); `-apply` writes, default only reports counts; a row under none of the keys fails the run with nothing changed. Run with the account service stopped
+
 ## v0.21.0 — 2026-11-05
 - The core owns `language` and `timezone` for every network (card #131 phase 0; gender stays per network). Migration 0030 adds
   `accounts.language` (BCP 47 style tag such as `en`, `pt-BR`, canonical casing, at most 20 characters) and `accounts.timezone`
