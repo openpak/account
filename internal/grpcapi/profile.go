@@ -18,7 +18,7 @@ func (s *Server) UpdatePublicProfile(ctx context.Context, req *accountv1.UpdateP
 		return nil, status.Error(codes.InvalidArgument, "account_id required")
 	}
 	_, err := s.identity.UpdatePublicProfile(ctx, req.GetAccountId(), identity.PublicProfilePatch{
-		DisplayName: req.DisplayName, Country: req.Country, Bio: req.Bio, Motto: req.Motto,
+		DisplayName: req.DisplayName, Country: req.Country, Bio: req.Bio, Motto: req.Motto, Language: req.Language, Timezone: req.Timezone,
 	})
 	if errors.Is(err, identity.ErrNotFound) {
 		return nil, status.Error(codes.NotFound, "account not found")

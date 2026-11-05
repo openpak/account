@@ -24,7 +24,7 @@ func (s *Server) RegisterAccount(ctx context.Context, req *accountv1.RegisterAcc
 		return nil, status.Error(codes.InvalidArgument, "caller_namespace and purpose are required")
 	}
 	acct, token, err := s.identity.RegisterWithHandle(ctx, req.GetEmail(), req.GetPassword(), req.GetDisplayName(), req.GetHandle(),
-		identity.Profile{Country: req.GetCountry()})
+		identity.Profile{Country: req.GetCountry(), Language: optionalLanguage(req.GetLanguage()), Timezone: optionalTimezone(req.GetTimezone())})
 	if err != nil {
 		if err == identity.ErrEmailTaken {
 			// Existing unverified account: resend the verification email so
@@ -77,4 +77,21 @@ func (s *Server) SetDisplayName(ctx context.Context, req *accountv1.SetDisplayNa
 	default:
 		return nil, status.Error(codes.Internal, "internal error")
 	}
+}
+
+// Console-sent locale is a hint: a value the core cannot validate is dropped, never a failed registration.
+func optionalLanguage(v string) string {
+	n, err := identity.NormalizeLanguage(v)
+	if err != nil {
+		return ""
+	}
+	return n
+}
+
+func optionalTimezone(v string) string {
+	n, err := identity.ValidateTimezone(v)
+	if err != nil {
+		return ""
+	}
+	return n
 }

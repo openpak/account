@@ -559,8 +559,11 @@ type GetAccountResponse struct {
 	// Set while the account is closed (DELETION_PENDING): when it will be erased
 	// unless restored.
 	EraseAfterUnix int64 `protobuf:"varint,13,opt,name=erase_after_unix,json=eraseAfterUnix,proto3" json:"erase_after_unix,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Owned by the core, one value for every network. Empty when never set.
+	Language      string `protobuf:"bytes,14,opt,name=language,proto3" json:"language,omitempty"` // BCP 47 style short tag, e.g. "en", "pt-BR"
+	Timezone      string `protobuf:"bytes,15,opt,name=timezone,proto3" json:"timezone,omitempty"` // IANA name, e.g. "Europe/Dublin"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetAccountResponse) Reset() {
@@ -682,6 +685,20 @@ func (x *GetAccountResponse) GetEraseAfterUnix() int64 {
 		return x.EraseAfterUnix
 	}
 	return 0
+}
+
+func (x *GetAccountResponse) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *GetAccountResponse) GetTimezone() string {
+	if x != nil {
+		return x.Timezone
+	}
+	return ""
 }
 
 type SetAdapterCredentialRequest struct {
@@ -1959,6 +1976,8 @@ type AccountProjection struct {
 	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	Country       string                 `protobuf:"bytes,3,opt,name=country,proto3" json:"country,omitempty"`
+	Language      string                 `protobuf:"bytes,5,opt,name=language,proto3" json:"language,omitempty"`
+	Timezone      string                 `protobuf:"bytes,6,opt,name=timezone,proto3" json:"timezone,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2017,6 +2036,20 @@ func (x *AccountProjection) GetDisplayName() string {
 func (x *AccountProjection) GetCountry() string {
 	if x != nil {
 		return x.Country
+	}
+	return ""
+}
+
+func (x *AccountProjection) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *AccountProjection) GetTimezone() string {
+	if x != nil {
+		return x.Timezone
 	}
 	return ""
 }
@@ -2360,6 +2393,8 @@ type UpdatePublicProfileRequest struct {
 	Country       *string                `protobuf:"bytes,3,opt,name=country,proto3,oneof" json:"country,omitempty"`
 	Bio           *string                `protobuf:"bytes,4,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
 	Motto         *string                `protobuf:"bytes,5,opt,name=motto,proto3,oneof" json:"motto,omitempty"`
+	Language      *string                `protobuf:"bytes,6,opt,name=language,proto3,oneof" json:"language,omitempty"` // empty clears
+	Timezone      *string                `protobuf:"bytes,7,opt,name=timezone,proto3,oneof" json:"timezone,omitempty"` // IANA name; empty clears
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2429,6 +2464,20 @@ func (x *UpdatePublicProfileRequest) GetMotto() string {
 	return ""
 }
 
+func (x *UpdatePublicProfileRequest) GetLanguage() string {
+	if x != nil && x.Language != nil {
+		return *x.Language
+	}
+	return ""
+}
+
+func (x *UpdatePublicProfileRequest) GetTimezone() string {
+	if x != nil && x.Timezone != nil {
+		return *x.Timezone
+	}
+	return ""
+}
+
 var File_openpak_account_v1_account_proto protoreflect.FileDescriptor
 
 const file_openpak_account_v1_account_proto_rawDesc = "" +
@@ -2465,7 +2514,7 @@ const file_openpak_account_v1_account_proto_rawDesc = "" +
 	"\x13two_factor_required\x18\x06 \x01(\bR\x11twoFactorRequired\"2\n" +
 	"\x11GetAccountRequest\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\tR\taccountId\"\xc5\x03\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"\xfd\x03\n" +
 	"\x12GetAccountResponse\x12\x16\n" +
 	"\x06handle\x18\t \x01(\tR\x06handle\x12\x10\n" +
 	"\x03bio\x18\n" +
@@ -2481,7 +2530,9 @@ const file_openpak_account_v1_account_proto_rawDesc = "" +
 	"\bbirthday\x18\x06 \x01(\tR\bbirthday\x12,\n" +
 	"\x12two_factor_enabled\x18\a \x01(\bR\x10twoFactorEnabled\x12\x14\n" +
 	"\x05email\x18\b \x01(\tR\x05email\x12(\n" +
-	"\x10erase_after_unix\x18\r \x01(\x03R\x0eeraseAfterUnix\"\x99\x01\n" +
+	"\x10erase_after_unix\x18\r \x01(\x03R\x0eeraseAfterUnix\x12\x1a\n" +
+	"\blanguage\x18\x0e \x01(\tR\blanguage\x12\x1a\n" +
+	"\btimezone\x18\x0f \x01(\tR\btimezone\"\x99\x01\n" +
 	"\x1bSetAdapterCredentialRequest\x12)\n" +
 	"\x10caller_namespace\x18\x01 \x01(\tR\x0fcallerNamespace\x12\x18\n" +
 	"\apurpose\x18\x02 \x01(\tR\apurpose\x12\x1d\n" +
@@ -2572,13 +2623,15 @@ const file_openpak_account_v1_account_proto_rawDesc = "" +
 	"publicCode\"U\n" +
 	"\x13ListAccountsRequest\x12(\n" +
 	"\x10after_account_id\x18\x01 \x01(\tR\x0eafterAccountId\x12\x14\n" +
-	"\x05limit\x18\x02 \x01(\x05R\x05limit\"\x87\x01\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\"\xbf\x01\n" +
 	"\x11AccountProjection\x12\x16\n" +
 	"\x06handle\x18\x04 \x01(\tR\x06handle\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x18\n" +
-	"\acountry\x18\x03 \x01(\tR\acountry\"\x8c\x01\n" +
+	"\acountry\x18\x03 \x01(\tR\acountry\x12\x1a\n" +
+	"\blanguage\x18\x05 \x01(\tR\blanguage\x12\x1a\n" +
+	"\btimezone\x18\x06 \x01(\tR\btimezone\"\x8c\x01\n" +
 	"\x14ListAccountsResponse\x12A\n" +
 	"\baccounts\x18\x01 \x03(\v2%.openpak.account.v1.AccountProjectionR\baccounts\x121\n" +
 	"\x15next_after_account_id\x18\x02 \x01(\tR\x12nextAfterAccountId\",\n" +
@@ -2597,19 +2650,23 @@ const file_openpak_account_v1_account_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
 	"\x06handle\x18\x02 \x01(\tR\x06handle\"\x15\n" +
-	"\x13ClaimHandleResponse\"\xe3\x01\n" +
+	"\x13ClaimHandleResponse\"\xbf\x02\n" +
 	"\x1aUpdatePublicProfileRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tH\x00R\vdisplayName\x88\x01\x01\x12\x1d\n" +
 	"\acountry\x18\x03 \x01(\tH\x01R\acountry\x88\x01\x01\x12\x15\n" +
 	"\x03bio\x18\x04 \x01(\tH\x02R\x03bio\x88\x01\x01\x12\x19\n" +
-	"\x05motto\x18\x05 \x01(\tH\x03R\x05motto\x88\x01\x01B\x0f\n" +
+	"\x05motto\x18\x05 \x01(\tH\x03R\x05motto\x88\x01\x01\x12\x1f\n" +
+	"\blanguage\x18\x06 \x01(\tH\x04R\blanguage\x88\x01\x01\x12\x1f\n" +
+	"\btimezone\x18\a \x01(\tH\x05R\btimezone\x88\x01\x01B\x0f\n" +
 	"\r_display_nameB\n" +
 	"\n" +
 	"\b_countryB\x06\n" +
 	"\x04_bioB\b\n" +
-	"\x06_motto*\xa6\x01\n" +
+	"\x06_mottoB\v\n" +
+	"\t_languageB\v\n" +
+	"\t_timezone*\xa6\x01\n" +
 	"\rAccountStatus\x12\x1e\n" +
 	"\x1aACCOUNT_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15ACCOUNT_STATUS_ACTIVE\x10\x01\x12\x19\n" +

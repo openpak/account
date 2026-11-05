@@ -44,3 +44,11 @@ protoc -I proto --go_out=. --go_opt=module=openpak/account --go-grpc_out=. --go-
 ```
 
 The core never imports console protocol code (a guard test in `internal/architecture` enforces it); Wii U/3DS protocols live in `nn-account`. Link state machine: pending, active, revoking, revoked.
+
+## Profile language and timezone, and the `profile_updated` event
+
+`language` (BCP 47 style tag, `en`, `pt-BR`) and `timezone` (IANA name, `Europe/Dublin`) are core-owned for every network and returned by
+`GetAccount` and `ListAccounts`; gender stays per network. Any change to display name, country, birthday, bio, motto, language or timezone
+emits the durable invalidation event `profile_updated` (`account_id` set, no namespace, no subject) in the same transaction. Adapters
+that cache profile data subscribe to events and, on `profile_updated`, call `GetAccount` for that account (`profile_version` tells whether
+the cache is stale). Both fields live on the `accounts` row and go with account erasure.

@@ -60,6 +60,9 @@ type Account struct {
 	Bio            string
 	Motto          string
 	ProfileVersion uint64
+	// Owned by the core for every network: BCP 47 style tag and IANA zone name; empty when unset.
+	Language string
+	Timezone string
 }
 
 // Emitter records durable invalidation events inside the caller's
@@ -138,6 +141,9 @@ type Profile struct {
 	DisplayName string
 	Bio         *string
 	Motto       *string
+	// Empty at registration or in UpdateProfile means unset / leave alone.
+	Language string
+	Timezone string
 }
 
 // ErrBadDisplayName is the 1-32 character rule SetDisplayName shares with registration.
@@ -149,14 +155,26 @@ func (s *Service) SetDisplayName(ctx context.Context, accountID, displayName str
 	if dn == "" || len(dn) > 32 {
 		return ErrBadDisplayName
 	}
-	tag, err := s.pool.Exec(ctx,
-		`UPDATE accounts SET display_name = $2, profile_version = profile_version + 1, updated_at = now() WHERE id = $1 AND status = 'active'`,
-		accountID, dn)
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx,
+			`UPDATE accounts SET display_name = $2, profile_version = profile_version + 1, updated_at = now() WHERE id = $1 AND status = 'active'`,
+			accountID, dn)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrNotFound
+		}
+		if s.emitter != nil {
+			return s.emitter.EmitTx(ctx, tx, EventProfileUpdated, accountID, "", "")
+		}
+		return nil
+	})
+	if errors.Is(err, ErrNotFound) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("identity: set display name: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
 	}
 	return nil
 }
@@ -188,8 +206,8 @@ func (s *Service) RegisterWithProfile(ctx context.Context, email, password, disp
 		birthday = p.Birthday
 	}
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		_, e := tx.Exec(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name, country, birthday, handle)
-  VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''))`, id, strings.TrimSpace(email), normalized, string(hash), strings.TrimSpace(displayName), p.Country, birthday, p.Handle)
+		_, e := tx.Exec(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name, country, birthday, handle, language, timezone)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''),$9,$10)`, id, strings.TrimSpace(email), normalized, string(hash), strings.TrimSpace(displayName), p.Country, birthday, p.Handle, p.Language, p.Timezone)
 		if e != nil {
 			return e
 		}
@@ -213,7 +231,7 @@ func (s *Service) RegisterWithProfile(ctx context.Context, email, password, disp
 		return nil, "", err
 	}
 	return &Account{ID: id, Email: strings.TrimSpace(email), DisplayName: strings.TrimSpace(displayName),
-		Country: p.Country, Birthday: p.Birthday, Handle: p.Handle, Status: StatusActive}, token, nil
+		Country: p.Country, Birthday: p.Birthday, Handle: p.Handle, Language: p.Language, Timezone: p.Timezone, Status: StatusActive}, token, nil
 }
 
 // UpdateProfile sets the country and birthday of an existing account. Registration collects
@@ -229,17 +247,31 @@ func (s *Service) UpdateProfile(ctx context.Context, accountID string, p Profile
 	}
 	// A blank display name leaves the existing one: an update that omits a
 	// field must not erase it.
-	tag, err := s.pool.Exec(ctx,
-		`UPDATE accounts SET country = $2, birthday = $3,
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx,
+			`UPDATE accounts SET country = $2, birthday = $3,
 			display_name = COALESCE(NULLIF($4,''), display_name),
-			bio = COALESCE($5, bio), motto = COALESCE($6, motto), profile_version = profile_version + 1, updated_at = now()
+			bio = COALESCE($5, bio), motto = COALESCE($6, motto),
+			language = COALESCE(NULLIF($7,''), language), timezone = COALESCE(NULLIF($8,''), timezone),
+			profile_version = profile_version + 1, updated_at = now()
 		WHERE id = $1`,
-		accountID, p.Country, birthday, p.DisplayName, p.Bio, p.Motto)
+			accountID, p.Country, birthday, p.DisplayName, p.Bio, p.Motto, p.Language, p.Timezone)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrNotFound
+		}
+		if s.emitter != nil {
+			return s.emitter.EmitTx(ctx, tx, EventProfileUpdated, accountID, "", "")
+		}
+		return nil
+	})
+	if errors.Is(err, ErrNotFound) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, fmt.Errorf("identity: update profile: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return nil, ErrNotFound
 	}
 	return s.GetByID(ctx, accountID)
 }
@@ -326,9 +358,9 @@ func (s *Service) GetByID(ctx context.Context, id string) (*Account, error) {
 	// not selected here, and a console user object with country "" is not one
 	// a console will take.
 	err := s.pool.QueryRow(ctx, `SELECT id, email, display_name, status, email_verified_at, created_at,
-		COALESCE(country, ''), COALESCE(birthday::text, ''), COALESCE(handle,''), bio, motto, profile_version
+		COALESCE(country, ''), COALESCE(birthday::text, ''), COALESCE(handle,''), bio, motto, profile_version, language, timezone
 		FROM accounts WHERE id = $1 AND status <> 'deleted'`, id).
-		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday, &a.Handle, &a.Bio, &a.Motto, &a.ProfileVersion)
+		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Country, &a.Birthday, &a.Handle, &a.Bio, &a.Motto, &a.ProfileVersion, &a.Language, &a.Timezone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -755,6 +787,13 @@ func validateProfile(p *Profile) error {
 	}
 	p.Country = strings.ToUpper(strings.TrimSpace(p.Country))
 	p.Birthday = strings.TrimSpace(p.Birthday)
+	var err error
+	if p.Language, err = NormalizeLanguage(p.Language); err != nil {
+		return err
+	}
+	if p.Timezone, err = ValidateTimezone(p.Timezone); err != nil {
+		return err
+	}
 	if p.Country != "" && len(p.Country) != 2 {
 		return errors.New("identity: country must be a two-letter code")
 	}

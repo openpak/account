@@ -30,9 +30,10 @@ message RegisterAccountRequest {
   string email = 3;
   string password = 4;
   string display_name = 5;
-  // Console-expressed locale, kept for the adapter's own records only.
+  // Console-expressed locale; language and timezone are stored on the account core (optional, an invalid value is dropped).
   string country = 6;
   string language = 7;
+  string timezone = 9; // optional IANA name
 }
 
 message RegisterAccountResponse {

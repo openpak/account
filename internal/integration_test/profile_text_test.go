@@ -58,3 +58,44 @@ func TestPublicProfileSharedBetweenWebAndAdapters(t *testing.T) {
 		t.Fatalf("UTF-16 limit not enforced: %v", err)
 	}
 }
+
+func TestLanguageTimezonePatchAndEvent(t *testing.T) {
+	client, _, _, _, _, evc, ident := startGRPC(t)
+	ctx := authCtx()
+	a, _, err := ident.RegisterWithProfile(ctx, "lang@example.com", "correct horse battery", "Lang User", identity.Profile{Country: "IE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	since := latestEventVersion(t, evc)
+	lang, tz := "pt-br", "Europe/Dublin"
+	got, err := client.UpdatePublicProfile(ctx, &accountv1.UpdatePublicProfileRequest{AccountId: a.ID, Language: &lang, Timezone: &tz})
+	if err != nil || got.GetLanguage() != "pt-BR" || got.GetTimezone() != tz {
+		t.Fatalf("set: %v %v", got, err)
+	}
+	// Omitted fields preserve both.
+	bio := "hi"
+	got, err = client.UpdatePublicProfile(ctx, &accountv1.UpdatePublicProfileRequest{AccountId: a.ID, Bio: &bio})
+	if err != nil || got.GetLanguage() != "pt-BR" || got.GetTimezone() != tz {
+		t.Fatalf("omitted erased: %v %v", got, err)
+	}
+	// An invalid timezone is rejected and changes nothing.
+	bad := "Mars/Base"
+	if _, err := client.UpdatePublicProfile(ctx, &accountv1.UpdatePublicProfileRequest{AccountId: a.ID, Timezone: &bad}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("bad timezone: %v", err)
+	}
+	// Empty clears the language.
+	empty := ""
+	got, err = client.UpdatePublicProfile(ctx, &accountv1.UpdatePublicProfileRequest{AccountId: a.ID, Language: &empty})
+	if err != nil || got.GetLanguage() != "" || got.GetTimezone() != tz {
+		t.Fatalf("clear: %v %v", got, err)
+	}
+	n := 0
+	for _, e := range eventsSince(t, evc, since) {
+		if e.GetType() == "profile_updated" && e.GetAccountId() == a.ID {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("profile_updated events = %d, want 3", n)
+	}
+}

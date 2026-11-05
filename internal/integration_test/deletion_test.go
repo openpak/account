@@ -38,6 +38,9 @@ func TestFinalizeDeletionDestroysCredentials(t *testing.T) {
 	// Satellite rows the sweep must take with it (values are dummies; the
 	// point is the DELETE statements, not enrolment ceremonies).
 	pool := ident.Pool()
+	if _, err := pool.Exec(ctx, `UPDATE accounts SET language='pt-BR', timezone='Europe/Dublin' WHERE id=$1`, acct.ID); err != nil {
+		t.Fatal(err)
+	}
 	for _, q := range []string{
 		`INSERT INTO account_two_factor (account_id, secret_enc) VALUES ('` + acct.ID + `', '\x00')`,
 		`INSERT INTO two_factor_recovery_codes (account_id, code_hash) VALUES ('` + acct.ID + `', '\x01')`,
@@ -91,6 +94,10 @@ func TestFinalizeDeletionDestroysCredentials(t *testing.T) {
 	}
 	if status != "deleted" || !strings.HasSuffix(email, "@deleted.invalid") || hash != "" || display != "" {
 		t.Errorf("accounts row not anonymized: %q %q hash=%q display=%q", status, email, hash, display)
+	}
+	var lang, tz string
+	if err := pool.QueryRow(ctx, `SELECT language, timezone FROM accounts WHERE id=$1`, acct.ID).Scan(&lang, &tz); err != nil || lang != "" || tz != "" {
+		t.Errorf("language/timezone survive erasure: %q %q %v", lang, tz, err)
 	}
 	// The handle stays held for 90 days and resolves to nobody.
 	var release *string

@@ -11,6 +11,21 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.21.0 — 2026-11-05
+- The core owns `language` and `timezone` for every network (card #131 phase 0; gender stays per network). Migration 0030 adds
+  `accounts.language` (BCP 47 style tag such as `en`, `pt-BR`, canonical casing, at most 20 characters) and `accounts.timezone`
+  (IANA name, checked with `time.LoadLocation`), both `TEXT NOT NULL DEFAULT ''`. Returned by `GetAccount` and `ListAccounts`; set by
+  `UpdatePublicProfile` (optional fields: omitted preserves, empty clears, an invalid timezone or language is `InvalidArgument` and
+  changes nothing), by the website profile form (`POST /v1/profile`, empty means leave alone) and optionally at `RegisterAccount`
+  (a console hint that does not validate is dropped, registration still succeeds). Every change bumps `profile_version`.
+- New durable event `profile_updated` (migration 0030 widens the type constraint; `events.KnownTypes`): emitted in the same transaction
+  as any display name, country, birthday, bio, motto, language or timezone change (`UpdatePublicProfile`, `SetDisplayName`,
+  `UpdateProfile`). It carries `account_id` only; adapters re-read the account (`GetAccount`) to refresh their cache.
+- Erasure: both columns are on the `accounts` row, which `FinalizeDeletion` anonymises column by column (it keeps the row for the held
+  handle), so it now also blanks `language` and `timezone`; `TestFinalizeDeletionDestroysCredentials` asserts it.
+- Tests: unit (`TestLanguageAndTimezoneValidation`) and integration (`TestLanguageTimezonePatchAndEvent`: set, omitted preserves, invalid
+  timezone rejected, empty clears, three events).
+
 ## v0.20.0 — 2026-11-04
 - The account's primary Mii (card #123). New `Mii` gRPC service (`PutMii` home-only, `GetMii`, `DeleteMii` home-only) and
   table `account_miis` (migration 0029). One Mii per account, stored once as Ver3 (96-byte Wii U / 3DS store data) with

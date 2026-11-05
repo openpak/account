@@ -664,12 +664,15 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request, acc
 		DisplayName string  `json:"display_name"`
 		Bio         *string `json:"bio"`
 		Motto       *string `json:"motto"`
+		Language    string  `json:"language"`
+		Timezone    string  `json:"timezone"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
 	updated, err := s.identity.UpdateProfile(r.Context(), acct.ID, identity.Profile{
-		Country: req.Country, Birthday: req.Birthday, DisplayName: req.DisplayName, Bio: req.Bio, Motto: req.Motto})
+		Country: req.Country, Birthday: req.Birthday, DisplayName: req.DisplayName, Bio: req.Bio, Motto: req.Motto,
+		Language: req.Language, Timezone: req.Timezone})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -677,6 +680,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request, acc
 	writeJSON(w, http.StatusOK, map[string]any{
 		"country": updated.Country, "birthday": updated.Birthday,
 		"display_name": updated.DisplayName, "bio": updated.Bio, "motto": updated.Motto,
+		"language": updated.Language, "timezone": updated.Timezone,
 	})
 }
 

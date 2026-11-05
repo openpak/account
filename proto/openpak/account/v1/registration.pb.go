@@ -125,9 +125,10 @@ type RegisterAccountRequest struct {
 	Email           string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
 	Password        string                 `protobuf:"bytes,4,opt,name=password,proto3" json:"password,omitempty"`
 	DisplayName     string                 `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	// Console-expressed locale, kept for the adapter's own records only.
+	// Console-expressed locale; language and timezone are stored on the account core (optional, an invalid value is dropped).
 	Country       string `protobuf:"bytes,6,opt,name=country,proto3" json:"country,omitempty"`
 	Language      string `protobuf:"bytes,7,opt,name=language,proto3" json:"language,omitempty"`
+	Timezone      string `protobuf:"bytes,9,opt,name=timezone,proto3" json:"timezone,omitempty"` // optional IANA name
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -218,6 +219,13 @@ func (x *RegisterAccountRequest) GetLanguage() string {
 	return ""
 }
 
+func (x *RegisterAccountRequest) GetTimezone() string {
+	if x != nil {
+		return x.Timezone
+	}
+	return ""
+}
+
 type RegisterAccountResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
@@ -291,7 +299,7 @@ const file_openpak_account_v1_registration_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12!\n" +
 	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\x18\n" +
-	"\x16SetDisplayNameResponse\"\x80\x02\n" +
+	"\x16SetDisplayNameResponse\"\x9c\x02\n" +
 	"\x16RegisterAccountRequest\x12\x16\n" +
 	"\x06handle\x18\b \x01(\tR\x06handle\x12)\n" +
 	"\x10caller_namespace\x18\x01 \x01(\tR\x0fcallerNamespace\x12\x18\n" +
@@ -300,7 +308,8 @@ const file_openpak_account_v1_registration_proto_rawDesc = "" +
 	"\bpassword\x18\x04 \x01(\tR\bpassword\x12!\n" +
 	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12\x18\n" +
 	"\acountry\x18\x06 \x01(\tR\acountry\x12\x1a\n" +
-	"\blanguage\x18\a \x01(\tR\blanguage\"\x88\x01\n" +
+	"\blanguage\x18\a \x01(\tR\blanguage\x12\x1a\n" +
+	"\btimezone\x18\t \x01(\tR\btimezone\"\x88\x01\n" +
 	"\x17RegisterAccountResponse\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12-\n" +
