@@ -3,11 +3,11 @@ package identity
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // SetAdapterCredential stores an adapter-domain secret (e.g. a console's
@@ -21,10 +21,10 @@ func (s *Service) SetAdapterCredential(ctx context.Context, namespace, accountID
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO adapter_credentials (namespace, account_id, secret_hash)
-		VALUES ($1,$2,$3) ON CONFLICT (namespace, account_id)
-		DO UPDATE SET secret_hash = EXCLUDED.secret_hash, updated_at = now()`,
-		strings.ToLower(namespace), accountID, string(hash))
+	_, err = s.pool.Exec(ctx, `INSERT INTO adapter_credentials (namespace, account_id, secret_hash, pepper_gen)
+		VALUES ($1,$2,$3,$4) ON CONFLICT (namespace, account_id)
+		DO UPDATE SET secret_hash = EXCLUDED.secret_hash, pepper_gen = EXCLUDED.pepper_gen, updated_at = now()`,
+		strings.ToLower(namespace), accountID, string(hash), s.pepperGen)
 	return err
 }
 
@@ -32,14 +32,15 @@ func (s *Service) SetAdapterCredential(ctx context.Context, namespace, accountID
 // account status outcome; never creates sessions.
 func (s *Service) VerifyAdapterCredential(ctx context.Context, namespace, accountID, secret string) (*Account, error) {
 	var hash string
+	var gen int16
 	var status Status
 	var verifiedAt *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT c.secret_hash, a.status, a.email_verified_at
+	err := s.pool.QueryRow(ctx, `SELECT c.secret_hash, c.pepper_gen, a.status, a.email_verified_at
 		FROM adapter_credentials c JOIN accounts a ON a.id = c.account_id
 		WHERE c.namespace=$1 AND c.account_id=$2`, strings.ToLower(namespace), accountID).
-		Scan(&hash, &status, &verifiedAt)
+		Scan(&hash, &gen, &status, &verifiedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, secret)))
+		s.dummyCompare(secret)
 		return nil, ErrBadCredentials
 	}
 	if err != nil {
@@ -48,8 +49,19 @@ func (s *Service) VerifyAdapterCredential(ctx context.Context, namespace, accoun
 	if err := mapStatusErr(status); err != nil {
 		return nil, err
 	}
-	if !comparePassword(hash, s.pepper, secret) {
+	ok, rehash := s.checkPassword(hash, gen, secret)
+	if !ok {
 		return nil, ErrBadCredentials
+	}
+	if rehash != "" {
+		err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `UPDATE adapter_credentials SET secret_hash=$4, pepper_gen=$5
+				WHERE namespace=$1 AND account_id=$2 AND secret_hash=$3`, strings.ToLower(namespace), accountID, hash, rehash, s.pepperGen)
+			return err
+		})
+		if err != nil {
+			log.Printf("identity: re-hashing an adapter credential under the new pepper failed: %v", err)
+		}
 	}
 	return &Account{ID: accountID, Status: status, EmailVerified: verifiedAt != nil}, nil
 }

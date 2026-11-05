@@ -226,7 +226,7 @@ func (s *Service) checkFactor(ctx context.Context, tx pgx.Tx, accountID, code, r
 	if !ok && enrolled && recovery != "" {
 		if rc := normalizeRecoveryCode(recovery); rc != "" {
 			tag, err := tx.Exec(ctx, `UPDATE two_factor_recovery_codes SET used_at=now()
-				WHERE account_id=$1 AND code_hash=$2 AND used_at IS NULL`, accountID, hashToken(rc, s.pepper))
+				WHERE account_id=$1 AND code_hash=ANY($2) AND used_at IS NULL`, accountID, s.tokenHashes(rc))
 			if err != nil {
 				return false, err
 			}
@@ -298,8 +298,8 @@ func (s *Service) CompleteLogin(ctx context.Context, challenge, code, recovery s
 		var fails int
 		err := tx.QueryRow(ctx, `SELECT c.id, c.account_id, c.failures FROM login_challenges c
 			JOIN accounts a ON a.id = c.account_id
-			WHERE c.token_hash=$1 AND c.used_at IS NULL AND c.expires_at > now() AND a.status='active'
-			FOR UPDATE OF c`, hashToken(challenge, s.pepper)).Scan(&id, &accountID, &fails)
+			WHERE c.token_hash=ANY($1) AND c.used_at IS NULL AND c.expires_at > now() AND a.status='active'
+			FOR UPDATE OF c`, s.tokenHashes(challenge)).Scan(&id, &accountID, &fails)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && fails >= challengeMaxFails) {
 			verr = ErrTokenInvalid
 			return nil

@@ -69,5 +69,5 @@ secret the core cannot rotate without invalidating every password. Changing
 the key with the service alone makes every enrolled second factor unreadable. To change it
 safely, stop the service and run `totp-rekey` (see its header: `ACCOUNT_TOTP_KEY_OLD`, then
 `-apply`), then start the service on the new key. `ACCOUNT_SESSION_SECRET` is also the password
-pepper: it is not rotated this way and must not change. Recovery codes are stored as peppered SHA-256
+pepper. It does not change with `totp-rekey`; to rotate the pepper set `ACCOUNT_SESSION_SECRET_NEW` (passwords move at sign-in, see the changelog for v0.22.0) and keep the old value until the `pepper_gen` counts say enough accounts have moved. Recovery codes are stored as peppered SHA-256
 hashes, like every other token.

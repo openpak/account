@@ -94,8 +94,8 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, token string) (account
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var next string
 		err := tx.QueryRow(ctx, `UPDATE lifecycle_tokens SET used_at = now()
-			WHERE token_hash = $1 AND purpose = 'email_change' AND used_at IS NULL AND expires_at > now()
-			RETURNING account_id, new_email`, hashToken(token, s.pepper)).Scan(&accountID, &next)
+			WHERE token_hash = ANY($1) AND purpose = 'email_change' AND used_at IS NULL AND expires_at > now()
+			RETURNING account_id, new_email`, s.tokenHashes(token)).Scan(&accountID, &next)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrTokenInvalid
 		}

@@ -80,6 +80,12 @@ func run() error {
 	if cfg.TOTPKey != "" {
 		ident.SetTOTPKey(cfg.TOTPKey)
 	}
+	if cfg.NewSessionSecret != "" {
+		ident.SetNewPepper(cfg.NewSessionSecret)
+		if st, err := ident.PepperStats(ctx); err == nil {
+			log.Printf("account: pepper cutover: accounts on the old pepper %d, on the new %d; adapter credentials old %d, new %d", st.Accounts[0], st.Accounts[1], st.AdapterCredentials[0], st.AdapterCredentials[1])
+		}
+	}
 	grace, err := time.ParseDuration(cfg.DeletionGrace)
 	if err != nil || grace <= 0 {
 		return errors.New("invalid ACCOUNT_DELETION_GRACE: want a positive duration such as 720h")

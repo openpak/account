@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -72,8 +73,13 @@ type Emitter interface {
 }
 
 type Service struct {
-	pool       *pgxpool.Pool
-	pepper     string
+	pool   *pgxpool.Pool
+	pepper string // current pepper: new hashes and tokens
+	// oldPepper, when set, is the retired pepper kept verify-only while accounts move over
+	// (SetNewPepper); pepperGen numbers the current one in the pepper_gen columns: 0 is
+	// ACCOUNT_SESSION_SECRET as it always was, 1 is ACCOUNT_SESSION_SECRET_NEW.
+	oldPepper  string
+	pepperGen  int16
 	sessionTTL time.Duration
 	emitter    Emitter
 	sealer     *sealer // TOTP secrets at rest; see SetTOTPKey
@@ -85,6 +91,102 @@ type Service struct {
 func New(pool *pgxpool.Pool, pepper string, sessionTTL time.Duration, emitter Emitter) *Service {
 	return &Service{pool: pool, pepper: pepper, sessionTTL: sessionTTL, emitter: emitter, sealer: newSealer(pepper),
 		deletionGrace: DefaultDeletionGrace}
+}
+
+// SetNewPepper makes newPepper the current one (ACCOUNT_SESSION_SECRET_NEW) and keeps the
+// pepper the service was built with as a verify-only fallback: passwords and tokens made under
+// it still work, a password is re-hashed under the new pepper at the next successful check,
+// and everything new uses the new one. The TOTP sealer is not touched (ACCOUNT_TOTP_KEY).
+func (s *Service) SetNewPepper(newPepper string) {
+	if newPepper == "" || newPepper == s.pepper {
+		return
+	}
+	s.oldPepper, s.pepper, s.pepperGen = s.pepper, newPepper, 1
+}
+
+// tokenHashes are the stored forms a raw token may have: under the current pepper and, while
+// one is kept, under the old one. Lookups match either; new tokens are stored under the current.
+func (s *Service) tokenHashes(token string) []string {
+	h := []string{hashToken(token, s.pepper)}
+	if s.oldPepper != "" {
+		h = append(h, hashToken(token, s.oldPepper))
+	}
+	return h
+}
+
+// pepperFor is the pepper a stored hash of generation gen was made under.
+func (s *Service) pepperFor(gen int16) string {
+	if s.oldPepper != "" && gen != s.pepperGen {
+		return s.oldPepper
+	}
+	return s.pepper
+}
+
+// checkPassword verifies secret against a stored hash and the generation recorded with it.
+// When it holds but the hash is not under the current pepper, rehash is the replacement hash
+// (under the current pepper) for the caller to store in the same transaction as its own work.
+func (s *Service) checkPassword(hash string, gen int16, secret string) (ok bool, rehash string) {
+	if !comparePassword(hash, s.pepperFor(gen), secret) {
+		return false, ""
+	}
+	if s.oldPepper != "" && gen != s.pepperGen {
+		if h, err := hashPassword(s.pepper, secret); err == nil {
+			return true, h
+		}
+	}
+	return true, ""
+}
+
+// dummyCompare spends one bcrypt comparison, so an unknown account costs what a known one does.
+func (s *Service) dummyCompare(secret string) {
+	_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, secret)))
+}
+
+// storeRehash writes a replacement password hash for an account, only while the stored hash is
+// still the one that was verified. Best effort: a failure leaves the old hash, which still works.
+func (s *Service) storeRehash(ctx context.Context, accountID, oldHash, newHash string) {
+	if newHash == "" {
+		return
+	}
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE accounts SET password_hash=$3, pepper_gen=$4 WHERE id=$1 AND password_hash=$2`,
+			accountID, oldHash, newHash, s.pepperGen)
+		return err
+	})
+	if err != nil {
+		log.Printf("identity: re-hashing a password under the new pepper failed: %v", err)
+	}
+}
+
+// PepperCount is how many password hashes are on each pepper generation.
+type PepperCount struct {
+	Accounts, AdapterCredentials map[int16]int
+}
+
+// PepperStats counts stored hashes per pepper generation (0 = old, 1 = new): the measure of the
+// cutover. Accounts with an empty hash (erased) are not counted.
+func (s *Service) PepperStats(ctx context.Context) (PepperCount, error) {
+	out := PepperCount{Accounts: map[int16]int{}, AdapterCredentials: map[int16]int{}}
+	for q, m := range map[string]map[int16]int{
+		`SELECT pepper_gen, count(*) FROM accounts WHERE password_hash <> '' AND status <> 'deleted' GROUP BY 1`: out.Accounts,
+		`SELECT pepper_gen, count(*) FROM adapter_credentials GROUP BY 1`:                                        out.AdapterCredentials,
+	} {
+		rows, err := s.pool.Query(ctx, q)
+		if err != nil {
+			return out, err
+		}
+		for rows.Next() {
+			var g int16
+			var n int
+			if err := rows.Scan(&g, &n); err != nil {
+				rows.Close()
+				return out, err
+			}
+			m[g] = n
+		}
+		rows.Close()
+	}
+	return out, nil
 }
 
 func normalizeEmail(email string) string {
@@ -206,8 +308,8 @@ func (s *Service) RegisterWithProfile(ctx context.Context, email, password, disp
 		birthday = p.Birthday
 	}
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		_, e := tx.Exec(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name, country, birthday, handle, language, timezone)
-  VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''),$9,$10)`, id, strings.TrimSpace(email), normalized, string(hash), strings.TrimSpace(displayName), p.Country, birthday, p.Handle, p.Language, p.Timezone)
+		_, e := tx.Exec(ctx, `INSERT INTO accounts (id, email, email_normalized, password_hash, display_name, country, birthday, handle, language, timezone, pepper_gen)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''),$9,$10,$11)`, id, strings.TrimSpace(email), normalized, string(hash), strings.TrimSpace(displayName), p.Country, birthday, p.Handle, p.Language, p.Timezone, s.pepperGen)
 		if e != nil {
 			return e
 		}
@@ -306,16 +408,17 @@ func (s *Service) Login(ctx context.Context, email, password string) (sessionTok
 func (s *Service) VerifyCredentials(ctx context.Context, email, password string) (*Account, error) {
 	normalized := normalizeEmail(email)
 	var id, hash, country string
+	var gen int16
 	var status Status
 	var verifiedAt *time.Time
 	var birthday *time.Time
 	var eraseAfter *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at, country, birthday, erase_after
+	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, pepper_gen, status, email_verified_at, country, birthday, erase_after
 		FROM accounts WHERE email_normalized = $1`, normalized).
-		Scan(&id, &hash, &status, &verifiedAt, &country, &birthday, &eraseAfter)
+		Scan(&id, &hash, &gen, &status, &verifiedAt, &country, &birthday, &eraseAfter)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Equalize timing by performing a dummy bcrypt comparison.
-		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, password)))
+		s.dummyCompare(password)
 		return nil, ErrBadCredentials
 	}
 	if err != nil {
@@ -324,9 +427,11 @@ func (s *Service) VerifyCredentials(ctx context.Context, email, password string)
 	if status == StatusDeletionPending {
 		// A closed account is restorable, and only its owner may learn that:
 		// the password is checked before the answer differs from a wrong one.
-		if !comparePassword(hash, s.pepper, password) {
+		ok, rehash := s.checkPassword(hash, gen, password)
+		if !ok {
 			return nil, ErrBadCredentials
 		}
+		s.storeRehash(ctx, id, hash, rehash)
 		pe := &PendingDeletionError{AccountID: id}
 		if eraseAfter != nil {
 			pe.EraseAfter = *eraseAfter
@@ -336,9 +441,11 @@ func (s *Service) VerifyCredentials(ctx context.Context, email, password string)
 	if err := mapStatusErr(status); err != nil {
 		return nil, err
 	}
-	if !comparePassword(hash, s.pepper, password) {
+	ok, rehash := s.checkPassword(hash, gen, password)
+	if !ok {
 		return nil, ErrBadCredentials
 	}
+	s.storeRehash(ctx, id, hash, rehash)
 	bday := ""
 	if birthday != nil {
 		bday = birthday.Format("2006-01-02")
@@ -378,8 +485,8 @@ func (s *Service) SessionAccount(ctx context.Context, token string) (*Account, e
 	var verifiedAt *time.Time
 	err := s.pool.QueryRow(ctx, `SELECT a.id, a.email, a.display_name, a.status, a.email_verified_at, a.created_at, COALESCE(a.handle,'')
 		FROM sessions s JOIN accounts a ON a.id = s.account_id
-		WHERE s.token_hash = $1 AND s.expires_at > now() AND s.revoked_at IS NULL`,
-		hashToken(token, s.pepper)).
+		WHERE s.token_hash = ANY($1) AND s.expires_at > now() AND s.revoked_at IS NULL`,
+		s.tokenHashes(token)).
 		Scan(&a.ID, &a.Email, &a.DisplayName, &a.Status, &verifiedAt, &a.CreatedAt, &a.Handle)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -457,7 +564,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 		}
 		defer tx.Rollback(ctx)
 		if _, err := tx.Exec(ctx,
-			`UPDATE accounts SET password_hash = $2, updated_at = now() WHERE id = $1`, accountID, string(hash)); err != nil {
+			`UPDATE accounts SET password_hash = $2, pepper_gen = $3, updated_at = now() WHERE id = $1`, accountID, string(hash), s.pepperGen); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx,
@@ -492,14 +599,14 @@ func (s *Service) ChangePassword(ctx context.Context, accountID, current, next, 
 	}
 	defer tx.Rollback(ctx)
 	if _, err := tx.Exec(ctx,
-		`UPDATE accounts SET password_hash = $2, updated_at = now() WHERE id = $1`, accountID, string(hash)); err != nil {
+		`UPDATE accounts SET password_hash = $2, pepper_gen = $3, updated_at = now() WHERE id = $1`, accountID, string(hash), s.pepperGen); err != nil {
 		return err
 	}
 	// Sessions are addressed by token hash, not by the cookie value: comparing the raw token
 	// against id would match nothing and revoke the caller's own session too.
 	if _, err := tx.Exec(ctx,
-		`UPDATE sessions SET revoked_at = now() WHERE account_id = $1 AND revoked_at IS NULL AND token_hash <> $2`,
-		accountID, hashToken(keepSessionToken, s.pepper)); err != nil {
+		`UPDATE sessions SET revoked_at = now() WHERE account_id = $1 AND revoked_at IS NULL AND token_hash <> ALL($2)`,
+		accountID, s.tokenHashes(keepSessionToken)); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -536,8 +643,8 @@ func (s *Service) consumeToken(ctx context.Context, token, purpose string, apply
 	defer tx.Rollback(ctx)
 	var accountID string
 	err = tx.QueryRow(ctx, `UPDATE lifecycle_tokens SET used_at = now()
-		WHERE token_hash = $1 AND purpose = $2 AND used_at IS NULL AND expires_at > now()
-		RETURNING account_id`, hashToken(token, s.pepper), purpose).Scan(&accountID)
+		WHERE token_hash = ANY($1) AND purpose = $2 AND used_at IS NULL AND expires_at > now()
+		RETURNING account_id`, s.tokenHashes(token), purpose).Scan(&accountID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrTokenInvalid
 	}
@@ -608,15 +715,16 @@ func (s *Service) Pool() *pgxpool.Pool { return s.pool }
 // returned error class.
 func (s *Service) VerifyByID(ctx context.Context, accountID, password string) (*Account, error) {
 	var id, hash string
+	var gen int16
 	var status Status
 	var verifiedAt *time.Time
 	var country string
 	var birthday *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, status, email_verified_at, country, birthday
+	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, pepper_gen, status, email_verified_at, country, birthday
 		FROM accounts WHERE id = $1`, accountID).
-		Scan(&id, &hash, &status, &verifiedAt, &country, &birthday)
+		Scan(&id, &hash, &gen, &status, &verifiedAt, &country, &birthday)
 	if errors.Is(err, pgx.ErrNoRows) {
-		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(bcryptInput(s.pepper, password)))
+		s.dummyCompare(password)
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -625,9 +733,11 @@ func (s *Service) VerifyByID(ctx context.Context, accountID, password string) (*
 	if err := mapStatusErr(status); err != nil {
 		return nil, err
 	}
-	if !comparePassword(hash, s.pepper, password) {
+	ok, rehash := s.checkPassword(hash, gen, password)
+	if !ok {
 		return nil, ErrBadCredentials
 	}
+	s.storeRehash(ctx, id, hash, rehash)
 	return &Account{ID: id, Status: status, EmailVerified: verifiedAt != nil}, nil
 }
 
@@ -705,8 +815,8 @@ func (s *Service) RequestDeletion(ctx context.Context, accountID string) error {
 // logout: the session must be dead in storage before success is reported.
 func (s *Service) RevokeByToken(ctx context.Context, token string) error {
 	tag, err := s.pool.Exec(ctx,
-		`UPDATE sessions SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL`,
-		hashToken(token, s.pepper))
+		`UPDATE sessions SET revoked_at = now() WHERE token_hash = ANY($1) AND revoked_at IS NULL`,
+		s.tokenHashes(token))
 	if err != nil {
 		return err
 	}
@@ -725,16 +835,19 @@ func (s *Service) RevokeByToken(ctx context.Context, token string) error {
 func (s *Service) ResendVerificationIfUnverified(ctx context.Context, email, password string) string {
 	normalized := normalizeEmail(email)
 	var accountID, passwordHash string
+	var gen int16
 	var verifiedAt *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, email_verified_at FROM accounts
+	err := s.pool.QueryRow(ctx, `SELECT id, password_hash, pepper_gen, email_verified_at FROM accounts
 		WHERE email_normalized=$1 AND status='active'`, normalized).
-		Scan(&accountID, &passwordHash, &verifiedAt)
+		Scan(&accountID, &passwordHash, &gen, &verifiedAt)
 	if err != nil || verifiedAt != nil {
 		return "" // unknown, deleted, banned, or already verified
 	}
-	if !comparePassword(passwordHash, s.pepper, password) {
+	ok, rehash := s.checkPassword(passwordHash, gen, password)
+	if !ok {
 		return "" // credential proof required to trigger email delivery
 	}
+	s.storeRehash(ctx, accountID, passwordHash, rehash)
 	return s.reissueVerification(ctx, accountID)
 }
 

@@ -11,6 +11,11 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.22.0 — 2026-11-05
+
+- Password pepper rotation without a password reset. `ACCOUNT_SESSION_SECRET_NEW` (optional, at least 32 bytes) becomes the current pepper; `ACCOUNT_SESSION_SECRET` stays as the verify-only fallback. Migration 0031 adds `pepper_gen` (0 = `ACCOUNT_SESSION_SECRET`, 1 = `_NEW`) to `accounts` and `adapter_credentials`; every password and adapter-credential check (`VerifyCredentials`, `VerifyByID`, `VerifyAdapterCredential`, resend-verification) reads the hash under the pepper its generation names, and a successful check on an old-pepper hash stores a new hash under the current pepper (compare-and-swap, own transaction). Registration, reset, change and `SetAdapterCredential` write under the current pepper. Session, lifecycle, email-change, login-challenge and recovery-code tokens are looked up under both peppers and stored under the current one. A startup log line counts accounts and adapter credentials per generation (the cutover measure). Unset `_NEW` behaves as before
+- Not touched: the TOTP sealer (`ACCOUNT_TOTP_KEY`)
+
 ## v0.21.1 — 2026-11-05
 
 - `totp-rekey` (in the image next to `handle-migrate`): moves the sealed two-factor secrets to a new `ACCOUNT_TOTP_KEY` in one transaction, accepting the previous key and the session pepper as the keys rows may be under now (`ACCOUNT_TOTP_KEY_OLD`, comma separated); `-apply` writes, default only reports counts; a row under none of the keys fails the run with nothing changed. Run with the account service stopped

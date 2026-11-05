@@ -21,6 +21,9 @@ type Config struct {
 	// SHA-256 of it). Optional; unset derives the key from SessionSecret.
 	// Changing it makes every enrolled second factor unreadable.
 	TOTPKey string
+	// NewSessionSecret (ACCOUNT_SESSION_SECRET_NEW), when set, is the current pepper; SessionSecret
+	// then stays as the verify-only fallback until accounts have moved over.
+	NewSessionSecret string
 	// DeletionGrace is how long a closed account stays restorable before it
 	// is erased everywhere (Go duration; default 720h, 30 days).
 	DeletionGrace string
@@ -28,14 +31,15 @@ type Config struct {
 
 func Load() (*Config, error) {
 	c := &Config{
-		DatabaseURL:    os.Getenv("ACCOUNT_DATABASE_URL"),
-		SessionSecret:  os.Getenv("ACCOUNT_SESSION_SECRET"),
-		GRPCListenAddr: envOr("ACCOUNT_GRPC_ADDR", ":7000"),
-		HTTPListenAddr: envOr("ACCOUNT_HTTP_ADDR", ":8000"),
-		SessionTTL:     envOr("ACCOUNT_SESSION_TTL", "720h"),
-		Environment:    envOr("ACCOUNT_ENVIRONMENT", "production"),
-		TOTPKey:        os.Getenv("ACCOUNT_TOTP_KEY"),
-		DeletionGrace:  envOr("ACCOUNT_DELETION_GRACE", "720h"),
+		DatabaseURL:      os.Getenv("ACCOUNT_DATABASE_URL"),
+		SessionSecret:    os.Getenv("ACCOUNT_SESSION_SECRET"),
+		GRPCListenAddr:   envOr("ACCOUNT_GRPC_ADDR", ":7000"),
+		HTTPListenAddr:   envOr("ACCOUNT_HTTP_ADDR", ":8000"),
+		SessionTTL:       envOr("ACCOUNT_SESSION_TTL", "720h"),
+		Environment:      envOr("ACCOUNT_ENVIRONMENT", "production"),
+		TOTPKey:          os.Getenv("ACCOUNT_TOTP_KEY"),
+		NewSessionSecret: os.Getenv("ACCOUNT_SESSION_SECRET_NEW"),
+		DeletionGrace:    envOr("ACCOUNT_DELETION_GRACE", "720h"),
 	}
 	if origins := os.Getenv("ACCOUNT_ALLOWED_ORIGINS"); origins != "" {
 		c.AllowedOrigins = strings.Split(origins, ",")
@@ -52,6 +56,9 @@ func Load() (*Config, error) {
 	}
 	if len(c.SessionSecret) < 32 {
 		return nil, errors.New("ACCOUNT_SESSION_SECRET must be at least 32 bytes")
+	}
+	if c.NewSessionSecret != "" && len(c.NewSessionSecret) < 32 {
+		return nil, errors.New("ACCOUNT_SESSION_SECRET_NEW must be at least 32 bytes when set")
 	}
 	if c.TOTPKey != "" && len(c.TOTPKey) < 32 {
 		return nil, errors.New("ACCOUNT_TOTP_KEY must be at least 32 bytes when set")
