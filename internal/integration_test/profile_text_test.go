@@ -99,3 +99,27 @@ func TestLanguageTimezonePatchAndEvent(t *testing.T) {
 		t.Fatalf("profile_updated events = %d, want 3", n)
 	}
 }
+
+// The rewards service announces a change to a player's game cosmetics on the universal stream.
+func TestEntitlementChangedEvent(t *testing.T) {
+	client, _, _, _, _, evc, ident := startGRPC(t)
+	ctx := authCtx()
+	a, _, err := ident.Register(ctx, "ent@example.com", "correct horse battery", "Ent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	since := latestEventVersion(t, evc)
+	if _, err := evc.EmitEvent(ctx, &accountv1.EmitEventRequest{Type: "entitlement_changed", AccountId: a.ID, SubjectId: "dst"}); err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	found := false
+	for _, e := range eventsSince(t, evc, since) {
+		if e.GetType() == "entitlement_changed" && e.GetAccountId() == a.ID && e.GetSubjectId() == "dst" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("entitlement_changed not on the stream")
+	}
+	_ = client
+}

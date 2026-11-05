@@ -11,6 +11,10 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.24.0 — 2026-11-05
+
+- Event type `entitlement_changed` (migration 0032, card #141): emitted by the rewards service through `EmitEvent` when a player's game cosmetics change; `subject_id` is the game id. Wire format unchanged (the type is a string).
+
 ## v0.23.0 — 2026-11-05
 
 - `GetPlayHistory` with `limit = -1` returns every title instead of the newest 20 (card #131 phase 9: rewards derives playtime from the whole history). Default and 0..N behaviour unchanged. Wire format unchanged.

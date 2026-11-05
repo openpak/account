@@ -45,6 +45,13 @@ protoc -I proto --go_out=. --go_opt=module=openpak/account --go-grpc_out=. --go-
 
 The core never imports console protocol code (a guard test in `internal/architecture` enforces it); Wii U/3DS protocols live in `nn-account`. Link state machine: pending, active, revoking, revoked.
 
+## The `entitlement_changed` event
+
+The rewards service emits it through `EmitEvent` when what an account owns or has equipped in a hosted game changes (a purchase, a mission or
+event reward, a revoke, an equip, a ban or unban): `account_id` is the player, no namespace, `subject_id` is the game id (`dst`, `stumble-guys`).
+A game adapter that caches the player's inventory drops that entry and reads rewards' `/internal/v1/adapter/inventory` again (its ETag is the
+revision). The 60 second cache time-out stays as the repair if an event is missed. Added in migration 0032.
+
 ## Profile language and timezone, and the `profile_updated` event
 
 `language` (BCP 47 style tag, `en`, `pt-BR`) and `timezone` (IANA name, `Europe/Dublin`) are core-owned for every network and returned by
