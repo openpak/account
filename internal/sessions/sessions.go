@@ -403,7 +403,7 @@ func (s *Service) Playtime(ctx context.Context) ([]PlayTally, error) {
 			UNION ALL
 			SELECT namespace, title_id, client, os,
 				GREATEST(0, extract(epoch FROM updated_at - online_since))::int
-			FROM adapter_sessions WHERE title_id <> '' AND online_since IS NOT NULL)
+			FROM adapter_sessions WHERE title_id <> '' AND online_since IS NOT NULL AND NOT idle)
 		SELECT namespace, title_id, client, os, sum(secs)::bigint, max(secs)::bigint, count(*)
 		FROM d WHERE secs > 0 GROUP BY namespace, title_id, client, os
 		ORDER BY namespace, title_id, client, os`)
@@ -457,7 +457,7 @@ func (s *Service) PlayHistory(ctx context.Context, accountID, namespace string, 
 			WHERE account_id = $1::uuid AND namespace = $2 AND title_id <> ''
 			UNION ALL
 			SELECT title_id, created_at, updated_at FROM adapter_sessions
-			WHERE account_id = $1::uuid AND namespace = $2 AND title_id <> '' AND expires_at > now())
+			WHERE account_id = $1::uuid AND namespace = $2 AND title_id <> '' AND expires_at > now() AND NOT idle)
 		SELECT title_id, count(*)::int,
 			GREATEST(0, sum(extract(epoch FROM ended_at - started_at)))::bigint,
 			extract(epoch FROM min(started_at))::bigint, extract(epoch FROM max(ended_at))::bigint
@@ -507,6 +507,41 @@ func nullTime(t time.Time) *time.Time {
 	return &t
 }
 
+// DefaultIdleTimeout is how long a titled session may go without evidence of play (see
+// ReapIdle) before the stretch is closed. Four hours is longer than the gap between game-server
+// logins in a long online session, and short enough that a title left open overnight is cut early.
+const DefaultIdleTimeout = 4 * time.Hour
+
+// ReapIdle closes the counted stretch of every live titled session whose last evidence of play
+// (adapter_sessions.last_active_at: the session starting, or a game server marking the player
+// online) is older than idle. The stretch is written to play_sessions from the session's start to
+// that last evidence, never to the last heartbeat: a lease renewing only shows the console is on.
+// The row stays, flagged idle, so presence is unchanged and the adapter need not re-register; it
+// counts nothing until MarkOnline wakes it. A stretch with no evidence beyond its own start has no
+// length and writes no row. Returns how many sessions were closed.
+func (s *Service) ReapIdle(ctx context.Context, idle time.Duration) (int, error) {
+	if idle <= 0 {
+		idle = DefaultIdleTimeout
+	}
+	var n int
+	err := s.pool.QueryRow(ctx, `WITH r AS (
+			UPDATE adapter_sessions SET idle = true
+			WHERE title_id <> '' AND NOT idle AND expires_at > now()
+			  AND last_active_at < now() - make_interval(secs => $1)
+			RETURNING account_id, namespace, title_id, client, os, created_at, last_active_at, online_since),
+		i AS (
+			INSERT INTO play_sessions (account_id, namespace, title_id, client, os, started_at, ended_at, online_seconds)
+			SELECT account_id, namespace, title_id, client, os, created_at, last_active_at,
+				CASE WHEN online_since IS NULL THEN 0
+				     ELSE GREATEST(0, extract(epoch FROM last_active_at - online_since))::int END
+			FROM r WHERE last_active_at > created_at)
+		SELECT count(*)::int FROM r`, int(idle.Seconds())).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("sessions: reap idle: %w", err)
+	}
+	return n, nil
+}
+
 // OnlinePlayer is one player a game server just let in.
 type OnlinePlayer struct{ AccountID, Namespace, TitleID string }
 
@@ -526,7 +561,12 @@ func (s *Service) MarkOnline(ctx context.Context, players []OnlinePlayer) (int, 
 		if !uuidRe.MatchString(p.AccountID) || p.Namespace == "" {
 			continue
 		}
-		tag, err := s.pool.Exec(ctx, `UPDATE adapter_sessions SET online_since = COALESCE(online_since, now())
+		// A game server seeing the player is the evidence of play: it also wakes an idle session,
+		// which starts a new counted stretch from now (the idle one was written out by ReapIdle).
+		tag, err := s.pool.Exec(ctx, `UPDATE adapter_sessions SET
+				online_since = CASE WHEN idle THEN now() ELSE COALESCE(online_since, now()) END,
+				created_at = CASE WHEN idle THEN now() ELSE created_at END,
+				idle = false, last_active_at = now()
 			WHERE account_id = $1::uuid AND namespace = $2 AND title_id <> ''
 			  AND ($3 = '' OR title_id = $3) AND expires_at > now()`,
 			p.AccountID, p.Namespace, p.TitleID)

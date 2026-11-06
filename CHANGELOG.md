@@ -11,6 +11,10 @@
 Generated from git history on 2026-09-15. `git log` stays the source
 of truth; this file is the readable summary.
 
+## v0.25.0 — 2026-11-06
+
+- Idle reaper for play sessions (card #142). A console renews its presence lease for as long as it is powered on, so a title left open ran 11-35 hours and the play history counted all of it (22 sessions over 6 h, 15 of them never reaching a game server). Migration 0033 adds `adapter_sessions.last_active_at` (the session starting, or a game server's `MarkOnline`) and `idle`. A once-a-minute reaper (`sessions.ReapIdle`) closes the counted stretch of any titled session with no such evidence for `ACCOUNT_SESSION_IDLE_TIMEOUT` (default 4h, minimum 1h): the stretch is written to `play_sessions` from its start to the last evidence, not to the last heartbeat, and the row stays, flagged idle, so presence and adapters are untouched. An idle session counts nothing (`GetPlayHistory`, `GetPlaytime`) until `MarkOnline` wakes it and starts a new stretch. Ending an idle session writes nothing further. Wire format unchanged.
+
 ## v0.24.0 — 2026-11-05
 
 - Event type `entitlement_changed` (migration 0032, card #141): emitted by the rewards service through `EmitEvent` when a player's game cosmetics change; `subject_id` is the game id. Wire format unchanged (the type is a string).

@@ -106,6 +106,28 @@ func run() error {
 			}
 		}()
 	}
+	// Idle reaper (card #142): a lease renewing proves the console is on, not that anyone is playing.
+	idleTimeout := sessions.DefaultIdleTimeout
+	if v := os.Getenv("ACCOUNT_SESSION_IDLE_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d < time.Hour {
+			log.Fatalf("ACCOUNT_SESSION_IDLE_TIMEOUT must be a duration of at least 1h, got %q", v)
+		}
+		idleTimeout = d
+	}
+	go func() {
+		for {
+			c, cancel := context.WithTimeout(ctx, 30*time.Second)
+			n, err := sessSvc.ReapIdle(c, idleTimeout)
+			cancel()
+			if err != nil {
+				log.Printf("idle reaper: %v", err)
+			} else if n > 0 {
+				log.Printf("idle reaper: closed %d session(s) with no sign of play for %s", n, idleTimeout)
+			}
+			time.Sleep(time.Minute)
+		}
+	}()
 	go func() {
 		var prev map[string]bool
 		for {

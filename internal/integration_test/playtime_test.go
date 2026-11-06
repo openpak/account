@@ -5,7 +5,9 @@ package integration_test
 import (
 	"context"
 	"testing"
+	"time"
 
+	"openpak/account/internal/sessions"
 	"openpak/account/internal/storage"
 	accountv1 "openpak/account/proto/openpak/account/v1"
 )
@@ -104,5 +106,74 @@ func TestPlaytimeFromGameServerLogin(t *testing.T) {
 	_ = pool.QueryRow(context.Background(), `SELECT count(*), coalesce(sum(online_seconds), 0) FROM play_sessions`).Scan(&n, &secs)
 	if got = tallies(); n != 2 || secs < 30*60 || len(got) != 1 || got[0].GetTotalSeconds() != int64(secs) {
 		t.Fatalf("after expiry: %d rows %d s, %+v", n, secs, got)
+	}
+}
+
+// A title left open is not play (card #142): heartbeats prove the console is on, so the reaper
+// closes a session whose last evidence of play (its start, or a game-server login) is older than
+// the idle timeout, at that evidence and not at the last renewal. The row stays, idle and
+// counting nothing, until a game server sees the player again.
+func TestIdleSessionReaped(t *testing.T) {
+	_, _, _, sc, _, _, ident := startGRPC(t)
+	ctx := authCtx()
+	pool, err := storage.Connect(context.Background(), testDBURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	a, _, err := ident.Register(ctx, "idle@example.com", "correct horse battery", "Player")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(), q, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reg, err := sc.RegisterSession(ctx, &accountv1.RegisterSessionRequest{
+		AccountId: a.ID, Namespace: "switch", TitleId: "0100C2500FC20000", EndpointRef: "baas", Client: "switch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 30 h ago it started, a game server saw the player 29 h ago, and the lease has been renewed since.
+	exec(`UPDATE adapter_sessions SET created_at = now() - interval '30 hours', online_since = now() - interval '29 hours',
+		last_active_at = now() - interval '28 hours', updated_at = now() WHERE account_id = $1`, a.ID)
+	reaper := sessions.New(pool)
+	n, err := reaper.ReapIdle(context.Background(), 4*time.Hour)
+	if err != nil || n != 1 {
+		t.Fatalf("reap: %d %v", n, err)
+	}
+	if n, _ = reaper.ReapIdle(context.Background(), 4*time.Hour); n != 0 {
+		t.Fatalf("second reap closed %d", n)
+	}
+	var rows, secs, spanSecs int
+	_ = pool.QueryRow(context.Background(), `SELECT count(*), coalesce(sum(online_seconds),0), coalesce(sum(extract(epoch FROM ended_at-started_at)),0)::int FROM play_sessions WHERE account_id=$1`, a.ID).Scan(&rows, &secs, &spanSecs)
+	if rows != 1 || secs != 3600 || spanSecs != 2*3600 {
+		t.Fatalf("closed stretch: rows=%d online=%d span=%d", rows, secs, spanSecs)
+	}
+	h, err := sc.GetPlayHistory(ctx, &accountv1.GetPlayHistoryRequest{AccountId: a.ID, Namespace: "switch"})
+	if err != nil || len(h.GetEntries()) != 1 || h.GetEntries()[0].GetTotalSeconds() != 2*3600 {
+		t.Fatalf("history after reap: %v %v", h, err)
+	}
+	// Still live for presence, and a heartbeat still works.
+	if _, err := sc.Heartbeat(ctx, &accountv1.HeartbeatRequest{SessionId: reg.GetSessionId()}); err != nil {
+		t.Fatal(err)
+	}
+	// Ending the idle session writes nothing more.
+	if _, err := sc.MarkOnline(ctx, &accountv1.MarkOnlineRequest{Players: []*accountv1.OnlinePlayer{{AccountId: a.ID, Namespace: "switch"}}}); err != nil {
+		t.Fatal(err)
+	}
+	var idle bool
+	_ = pool.QueryRow(context.Background(), `SELECT idle FROM adapter_sessions WHERE account_id=$1`, a.ID).Scan(&idle)
+	if idle {
+		t.Fatal("a game-server login did not wake the session")
+	}
+	if _, err := sc.ExpireSession(ctx, &accountv1.ExpireSessionRequest{SessionId: reg.GetSessionId()}); err != nil {
+		t.Fatal(err)
+	}
+	_ = pool.QueryRow(context.Background(), `SELECT count(*) FROM play_sessions WHERE account_id=$1`, a.ID).Scan(&rows)
+	if rows != 1 { // the woken stretch has no length yet, and the idle one is not written twice
+		t.Fatalf("rows after wake and expire: %d", rows)
 	}
 }
